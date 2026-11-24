@@ -1,0 +1,116 @@
+{
+  "passed": true,
+  "locations": [
+    {
+      "file": "lesson.ppt",
+      "role": "课件",
+      "page": 2,
+      "contains": "函数依赖",
+      "link": "lesson.ppt.pdf#page=2",
+      "actual": "函数依赖：学号相同的记录应对应同一个学生姓名。",
+      "passed": true
+    },
+    {
+      "file": "lesson.pptx",
+      "role": "课件",
+      "page": 2,
+      "contains": "函数依赖",
+      "link": "lesson.pptx.pdf#page=2",
+      "actual": "函数依赖：学号相同的记录应对应同一个学生姓名。",
+      "passed": true
+    },
+    {
+      "file": "notes.doc",
+      "role": "资料",
+      "page": 2,
+      "contains": "候选键",
+      "link": "notes.doc.pdf#page=2",
+      "actual": "候选键可以唯一标识元组，去掉其中任一属性后便失去唯一性。",
+      "passed": true
+    },
+    {
+      "file": "notes.docx",
+      "role": "资料",
+      "page": 2,
+      "contains": "候选键",
+      "link": "notes.docx.pdf#page=2",
+      "actual": "候选键可以唯一标识元组，去掉其中任一属性后便失去唯一性。",
+      "passed": true
+    },
+    {
+      "file": "outline.md",
+      "role": "资料",
+      "line": 3,
+      "contains": "投影",
+      "link": "outline.md.html#L3",
+      "actual": "投影保留指定的属性列。",
+      "passed": true
+    },
+    {
+      "file": "clear.png",
+      "role": "试卷",
+      "contains": "唯一标识",
+      "link": "clear.png",
+      "actual": "第 1 题\r\n能 唯 一 标 识 元 组 的 最 小 属 性 集 合 叫 什 么 ？\r\n说 明 为 什 么 不 能 再 删 去 其 中 任 何 一 个 属 性 。",
+      "passed": true
+    },
+    {
+      "file": "unclear.jpg",
+      "role": "试卷",
+      "contains": "第2题",
+      "link": "unclear.jpg",
+      "actual": "第 2 题",
+      "passed": true
+    }
+  ],
+  "questions": [
+    {
+      "page": 1,
+      "question": "1",
+      "concept": "key",
+      "review": false,
+      "actual": {
+        "segment": "exam-p1",
+        "question": "1",
+        "concept": "key",
+        "score": 0.794,
+        "review": ""
+      },
+      "passed": true
+    },
+    {
+      "page": 2,
+      "question": "2",
+      "concept": null,
+      "review": true,
+      "actual": {
+        "segment": "exam-p2",
+        "question": "2",
+        "concept": null,
+        "score": 0.3345,
+        "review": "题号或可读题干不足"
+      },
+      "passed": true
+    },
+    {
+      "page": 3,
+      "question": "3",
+      "concept": "algebra",
+      "review": false,
+      "actual": {
+        "segment": "exam-p3",
+        "question": "3",
+        "concept": "algebra",
+        "score": 0.6833,
+        "review": ""
+      },
+      "passed": true
+    }
+  ],
+  "metrics": {
+    "model": "bge-small-zh-v1.5 / ONNX int8 / CPU",
+    "batch_ms": 95,
+    "inference_and_matching_ms": 12,
+    "agent_peak_working_set_mib": 102.0
+  }
+}

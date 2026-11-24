@@ -1,0 +1,78 @@
+{
+  "concepts": [
+    {
+      "id": "fd",
+      "description": "函数依赖，关系中的属性决定另一个属性，学号决定姓名。"
+    },
+    {
+      "id": "key",
+      "description": "候选键，最小的能够唯一标识元组的属性集合。"
+    },
+    {
+      "id": "algebra",
+      "description": "关系代数，对关系做选择、投影和连接运算。"
+    }
+  ],
+  "questions": [
+    {
+      "page": 1,
+      "question": "1",
+      "concept": "key",
+      "review": false
+    },
+    {
+      "page": 2,
+      "question": "2",
+      "concept": null,
+      "review": true
+    },
+    {
+      "page": 3,
+      "question": "3",
+      "concept": "algebra",
+      "review": false
+    }
+  ],
+  "locations": [
+    {
+      "file": "lesson.ppt",
+      "role": "课件",
+      "page": 2,
+      "contains": "函数依赖"
+    },
+    {
+      "file": "lesson.pptx",
+      "role": "课件",
+      "page": 2,
+      "contains": "函数依赖"
+    },
+    {
+      "file": "notes.doc",
+      "role": "资料",
+      "page": 2,
+      "contains": "候选键"
+    },
+    {
+      "file": "notes.docx",
+      "role": "资料",
+      "page": 2,
+      "contains": "候选键"
+    },
+    {
+      "file": "outline.md",
+      "role": "资料",
+      "line": 3,
+      "contains": "投影"
+    },
+    {
+      "file": "clear.png",
+      "role": "试卷",
+      "contains": "唯一标识"
+    },
+    {
+      "file": "unclear.jpg",
+      "role": "试卷",
+      "contains": "第2题"
+    }
+  ]
+}

@@ -1,0 +1,33 @@
+{
+  "version": 1,
+  "batch": "ad642f1a-f274-486e-a849-fe74268907e0",
+  "matches": [
+    {
+      "segment": "exam-p1",
+      "question": "1",
+      "concept": "key",
+      "score": 0.794,
+      "review": ""
+    },
+    {
+      "segment": "exam-p2",
+      "question": "2",
+      "concept": null,
+      "score": 0.3345,
+      "review": "题号或可读题干不足"
+    },
+    {
+      "segment": "exam-p3",
+      "question": "3",
+      "concept": "algebra",
+      "score": 0.6833,
+      "review": ""
+    }
+  ],
+  "metrics": {
+    "model": "bge-small-zh-v1.5 / ONNX int8 / CPU",
+    "batch_ms": 95,
+    "inference_and_matching_ms": 12,
+    "agent_peak_working_set_mib": 102.0
+  }
+}
