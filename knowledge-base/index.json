@@ -68,6 +68,16 @@
       "verified_on": null,
       "verification_scope": null,
       "verification_evidence": []
+    },
+    {
+      "path": "knowledge-base/m1-acceptance.md",
+      "title": "M1 需求与测试用例生成输入",
+      "status": "draft",
+      "status_reason": "依据本轮已同意的 M1 范围整理，供独立测试设计与复核。",
+      "verification_state": "unverified",
+      "verified_on": null,
+      "verification_scope": null,
+      "verification_evidence": []
     }
   ]
 }

@@ -1,0 +1,167 @@
+* {
+  box-sizing: border-box;
+}
+body {
+  margin: 0;
+  background: #f6f5f0;
+  color: #1e322e;
+  font-family: "Source Sans 3", "Microsoft YaHei", sans-serif;
+}
+main {
+  max-width: 1080px;
+  margin: auto;
+  padding: 32px clamp(16px, 4vw, 52px) 64px;
+}
+header,
+.bar {
+  display: flex;
+  justify-content: space-between;
+  align-items: center;
+  gap: 16px;
+}
+header {
+  padding-bottom: 20px;
+  border-bottom: 1px solid #bdc9bf;
+  color: #435b52;
+}
+h1 {
+  font-size: clamp(32px, 5vw, 54px);
+  margin: 48px 0 34px;
+}
+h2 {
+  font-size: 23px;
+  margin: 18px 0;
+}
+h3 {
+  font-size: 18px;
+  margin: 0 0 18px;
+}
+.hint {
+  color: #4e6057;
+  line-height: 1.7;
+}
+fieldset {
+  border: 0;
+  margin: 0;
+  padding: 0;
+}
+.zones {
+  display: grid;
+  grid-template-columns: repeat(3, minmax(0, 1fr));
+  gap: 14px;
+}
+.zone,
+article {
+  padding: 20px;
+  background: #fff;
+  border: 1px solid #cbd4cb;
+  border-radius: 8px;
+}
+.picker,
+button,
+select {
+  font: inherit;
+  cursor: pointer;
+}
+.picker {
+  display: block;
+  text-align: center;
+  padding: 14px 8px;
+  border: 1px dashed #6f9687;
+  border-radius: 5px;
+  background: #f4f8f4;
+  color: #275444;
+}
+.picker:focus-within {
+  outline: 2px solid;
+}
+.picker input {
+  position: absolute;
+  width: 1px;
+  height: 1px;
+  opacity: 0;
+}
+.draft,
+.source {
+  padding: 12px 0;
+  border-top: 1px solid #d9dfd8;
+  margin-top: 12px;
+}
+.draft b {
+  display: block;
+  margin-bottom: 8px;
+}
+b,
+pre {
+  overflow-wrap: anywhere;
+}
+.primary,
+button {
+  border: 1px solid #abbcb2;
+  border-radius: 5px;
+  padding: 7px 12px;
+  background: #fff;
+}
+.primary {
+  background: #245e49;
+  color: white;
+  margin: 18px 0;
+  padding: 11px 22px;
+}
+.primary:disabled {
+  opacity: 0.55;
+}
+.sub {
+  margin-left: 8px;
+}
+.source strong {
+  margin-left: 12px;
+  color: #884b08;
+}
+pre,
+[role="alert"] {
+  white-space: pre-wrap;
+  font: inherit;
+  line-height: 1.65;
+}
+[role="alert"] {
+  color: #923f1f;
+}
+a {
+  color: #235c49;
+}
+article {
+  margin: 12px 0;
+}
+article .bar {
+  margin-bottom: 12px;
+}
+details {
+  margin-top: 16px;
+}
+summary {
+  cursor: pointer;
+}
+details div {
+  margin: 8px 0;
+}
+select {
+  padding: 5px;
+  border: 1px solid #afc0b6;
+  border-radius: 5px;
+}
+@media (max-width: 650px) {
+  .zones {
+    grid-template-columns: 1fr;
+  }
+  .bar {
+    align-items: flex-start;
+    flex-wrap: wrap;
+  }
+  h1 {
+    margin: 28px 0;
+  }
+  .zone {
+    padding: 14px;
+  }
+}

@@ -1,6 +1,26 @@
 # final-exam-agent
 期末保命
 
+## M1 课程资料导入
+
+打开《数据库原理》，在课件、资料、试卷三个区选择文件，可在提交前调整用途。按文件查看处理状态、下载原件，并从文本打开 PDF 原页图像、Office 转换预览、Markdown 原行或上传的原图。受损扫描页保留核对入口。相同名称、用途和内容的文件复用同一记录；再次提交同一组文件会打开已有批次。
+
+在 Windows 上使用 PowerShell 7.4+、JDK 21、Maven 3.9、Node.js 22.12+ 和运行中的 Docker Desktop（Linux 容器）。Office 预览需要 LibreOffice，中文扫描识别使用 Windows 简体中文 OCR 语言包。首次启动会下载构建依赖和镜像。在仓库或 M1 worktree 根目录运行：
+
+```powershell
+./m1.ps1
+```
+
+浏览器打开 [本机课程页](http://127.0.0.1:8080)。脚本先构建 React 和 Java，再启动 MySQL 与 MinIO，并在前台运行 Spring Boot。可用 `-Office '<soffice.com 的完整路径>'`、`-Maven '<mvn.cmd 的完整路径>'` 指定工具；脚本也会查找主工作区已准备好的 M0 LibreOffice。已有构建产物时用 `./m1.ps1 -SkipBuild`。按 Ctrl+C 结束 Java，再用 `docker compose stop` 停止存储。下次运行脚本可恢复课程。
+
+本机服务分别占用 8080、33306、39000 端口。首次运行生成的 `.env` 保存访问本机存储的随机凭据，请与 Docker 数据卷一同保留。MinIO 使用固定摘要的 Bitnami 归档镜像。每份文件上限 50 MB；图片解码上限 4000 万像素。Office 预览采用转换后的页序。OCR 的短文本会标记待核对，公式或下标误识别仍需对照原图。
+
+[M1 测试用例生成输入](knowledge-base/m1-acceptance.md) 可独立交给测试设计者。生成含三页扫描卷的 M0 样例后，在专用测试课程运行以下命令；它会向当前本机实例导入 11 份自制材料并核对结果。
+
+```powershell
+node m1-tests/import.mjs '<M0 样例输出目录>'
+```
+
 ## M0 可行性原型
 
 在 Windows 上生成《数据库原理》自制样卷和 Office 样例，运行中文 OCR 与本地考点匹配，再从演示页打开对应原页。人工答案位于 [样例清单](m0/fixtures/truth.json)，本机结果与局限见 [M0 实测记录](knowledge-base/m0-results.md)。

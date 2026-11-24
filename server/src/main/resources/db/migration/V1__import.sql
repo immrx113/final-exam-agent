@@ -1,0 +1,26 @@
+CREATE TABLE files (
+  id CHAR(64) PRIMARY KEY,
+  name VARCHAR(255) NOT NULL,
+  role VARCHAR(12) NOT NULL,
+  digest CHAR(64) NOT NULL
+);
+CREATE TABLE jobs (
+  seq BIGINT AUTO_INCREMENT PRIMARY KEY,
+  id CHAR(36) NOT NULL UNIQUE
+);
+CREATE TABLE items (
+  job CHAR(36) NOT NULL,
+  file CHAR(64) NOT NULL,
+  status VARCHAR(12) NOT NULL DEFAULT 'queued',
+  reason VARCHAR(250),
+  preview VARCHAR(200),
+  PRIMARY KEY(job,file),
+  FOREIGN KEY(job) REFERENCES jobs(id),
+  FOREIGN KEY(file) REFERENCES files(id)
+);
+CREATE TABLE segments (
+  job CHAR(36) NOT NULL, file CHAR(64) NOT NULL, pos INT NOT NULL,
+  body MEDIUMTEXT NOT NULL, review BOOLEAN NOT NULL,
+  PRIMARY KEY(job,file,pos),
+  FOREIGN KEY(job,file) REFERENCES items(job,file)
+);
