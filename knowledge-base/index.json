@@ -1,0 +1,29 @@
+{
+  "schema_version": 1,
+  "statuses": {
+    "draft": "草稿或待确认，用于讨论和调研。",
+    "active": "已确定采用，可在完成核验后作为开发依据。",
+    "needs_redesign": "已过时或存在已知问题，需要重新设计。",
+    "historical": "归档的设计或决策，用于追溯历史。"
+  },
+  "verification_states": {
+    "unverified": "尚未核验或原核验已失效。",
+    "verified": "已依据记录的来源核验，结论限于登记的范围。"
+  },
+  "development_basis": {
+    "status": "active",
+    "verification_state": "verified",
+    "scope": "两项条件必须同时满足，且任务所依赖的内容必须落在核验范围内。"
+  },
+  "entry_fields": {
+    "path": "唯一的仓库相对路径，使用 / 分隔。",
+    "title": "文档标题。",
+    "status": "statuses 中的一个值。",
+    "status_reason": "采用、待确认、需要重新设计或归档的原因。",
+    "verification_state": "verification_states 中的一个值。",
+    "verified_on": "核验日期，格式为 YYYY-MM-DD。未核验时为 null。",
+    "verification_scope": "已核验的章节、结论或行为。未核验时为 null。",
+    "verification_evidence": "依据列表，例如课程材料、相关代码、测试结果或用户确认记录。未核验时为空数组，已核验时至少有一项。"
+  },
+  "documents": []
+}
