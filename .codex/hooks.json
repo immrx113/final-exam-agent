@@ -1,0 +1,15 @@
+{
+  "hooks": {
+    "SessionStart": [
+      {
+        "hooks": [
+          {
+            "type": "command",
+            "command": "\"C:/Users/11322/Desktop/cs/project/final review/.codex/hooks/gsd-check-update.cmd\"",
+            "commandWindows": "\"C:/Users/11322/Desktop/cs/project/final review/.codex/hooks/gsd-check-update.cmd\""
+          }
+        ]
+      }
+    ]
+  }
+}
