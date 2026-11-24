@@ -68,6 +68,16 @@
       "verified_on": null,
       "verification_scope": null,
       "verification_evidence": []
+    },
+    {
+      "path": "knowledge-base/m1-test-cases.md",
+      "title": "M1 测试用例",
+      "status": "draft",
+      "status_reason": "依据 m1-acceptance.md 的 M1-01～M1-09 生成中文测试用例，供 codex 开发 M1 时作为可执行验收依据，待按实测结果复核。",
+      "verification_state": "unverified",
+      "verified_on": null,
+      "verification_scope": null,
+      "verification_evidence": []
     }
   ]
 }
