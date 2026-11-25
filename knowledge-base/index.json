@@ -30,7 +30,7 @@
       "path": "knowledge-base/development-notes.md",
       "title": "开发问题与性能优化记录",
       "status": "draft",
-      "status_reason": "已建立项目亮点记录模板，待积累实际案例并核验。",
+      "status_reason": "已记录 M3 笔记标签定位问题、修复和浏览器验证结果，待作为开发依据前核验。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,
@@ -103,13 +103,13 @@
     },
     {
       "path": "knowledge-base/m3-acceptance.md",
-      "title": "M3 学习与导出 · 需求与验收草案",
-      "status": "draft",
-      "status_reason": "用户已确认 Markdown 导出和零命中排除规则，其余 M3 细则待确认并核验。",
-      "verification_state": "unverified",
-      "verified_on": null,
-      "verification_scope": null,
-      "verification_evidence": []
+      "title": "M3 学习与导出 · 需求与验收",
+      "status": "active",
+      "status_reason": "用户在修订导出要求后要求实施 M3。",
+      "verification_state": "verified",
+      "verified_on": "2026-11-25",
+      "verification_scope": "M3-01 至 M3-08 的需求及文末记录的自制样例实测。参考计划识别的前置表述与重分析保留状态的条件见 README。",
+      "verification_evidence": ["2026-11-25 用户明确使用 Markdown 并排除零命中知识点，审阅修订后的范围后要求“进行M3阶段”。", "2026-11-25 专用 MySQL、MinIO、Redis 和 Edge 中运行 m3-tests/course.mjs、restart.mjs prepare/verify，实际重启 Java 并使用 m2-tests/fault_agent.py 注入分析失败；StudyRulesTest.java 规则用例通过。"]
     },
     {
       "path": "knowledge-base/m1-test-cases.md",

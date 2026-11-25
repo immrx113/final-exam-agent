@@ -39,7 +39,7 @@ class AnalysisApi {
       int paperCount,
       List<Ranked> ranked,
       Map<String, Ref> sources,
-      List<Review> reviews) {}
+      List<Review> reviews, List<StudyPlan.Step> plan) {}
 
   final Catalog catalog;
   final ImportApi imports;
@@ -114,7 +114,10 @@ class AnalysisApi {
     String version = UUID.randomUUID().toString();
     Output output = runAgent(files, version);
     validate(output, version, refs);
-    return tx.execute(status -> publish(job.toString(), version, refs, output));
+    var passages = files.stream().filter(f -> !f.role().equals("exam"))
+        .flatMap(f -> f.segments().stream()).filter(s -> !s.review())
+        .map(s -> new StudyPlan.Passage(s.body(), s.id())).toList();
+    return tx.execute(status -> publish(job.toString(), version, refs, output, passages));
   }
 
   private Output runAgent(List<Input> files, String batch) throws Exception {
@@ -199,7 +202,7 @@ class AnalysisApi {
     return UUID.nameUUIDFromBytes(("数据库原理/" + name).getBytes(StandardCharsets.UTF_8)).toString();
   }
 
-  private Result publish(String job, String version, Map<String, Ref> refs, Output out) {
+  private Result publish(String job, String version, Map<String, Ref> refs, Output out, List<StudyPlan.Passage> passages) {
     db.begin(version, job);
     Map<String, List<Question>> evidence = new HashMap<>();
     Set<String> papers = new HashSet<>();
@@ -234,7 +237,7 @@ class AnalysisApi {
             .reversed()
             .thenComparing(Comparator.comparingInt(Ranked::papers).reversed())
             .thenComparingInt(r -> chapters.get(r.topic().chapter())));
-    Result result = new Result(version, job, papers.size(), ranked, refs, out.reviews());
+    Result result = new Result(version, job, papers.size(), ranked, refs, out.reviews(), StudyPlan.build(ranked, papers.size(), passages));
     try {
       db.finish(version, json.writeValueAsString(result));
     } catch (IOException e) {

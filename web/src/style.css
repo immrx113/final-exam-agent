@@ -167,3 +167,7 @@ select {
 }
 .evidence-link { display: inline-block; margin: .15rem .5rem .15rem 0; }
 .topic summary { cursor: pointer; padding: .45rem 0; }
+.study-item { border-top: 1px solid #cdd7d3; padding: 1rem 0; }
+.study-item > p { margin: .25rem 0 .65rem; }
+.study-note { display: grid; gap: .35rem; margin: .75rem 0; }
+.study-note textarea { font: inherit; padding: .6rem; width: 100%; box-sizing: border-box; resize: vertical; }

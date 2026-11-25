@@ -1,7 +1,8 @@
 import { useEffect, useRef, useState } from "react";
+import { Study } from "./Study";
 
 type Question = { label: string; refs: string[] };
-type Topic = {
+export type Topic = {
   id: string;
   outlineOrder?: number;
   topic: { name: string; chapter: string; text: string; refs: string[] };
@@ -13,6 +14,7 @@ type Snapshot = {
   job: string;
   version: string;
   paperCount: number;
+  plan?: {topic: string; reason: string; ref?: string}[];
   ranked: Topic[];
   sources: Record<string, { name: string; label: string; url: string }>;
   reviews: { reason: string; refs: string[] }[];
@@ -65,6 +67,9 @@ export function Analysis({ job, ready }: { job: string; ready: boolean }) {
   }
   const visible = result?.paperCount ? result.ranked.filter(row => row.count > 0) : result?.ranked ?? [];
   const outline = [...visible].sort((a,b) => (a.outlineOrder ?? 0) - (b.outlineOrder ?? 0));
+  const topics = new Map(visible.map(r => [r.id, r]));
+  const plan = result?.plan ?? visible.map(r => ({topic: r.id, reason: result?.paperCount
+    ? "按真题频次安排，命中 " + r.count + " 题。" : "暂无试卷统计，按课程章节顺序学习。", ref: undefined}));
   return <section aria-label="课程分析">
     <div className="bar"><h2>课程分析</h2>
       <button className="primary" disabled={!ready || busy} onClick={() => load(true)}>
@@ -72,12 +77,19 @@ export function Analysis({ job, ready }: { job: string; ready: boolean }) {
       </button>
     </div>
     {error && <p role="alert">{error} <button onClick={() => load(false)}>读取上次结果</button></p>}
+    {!result && !busy && !error && <p>请先分析本批资料，生成复习计划和待办。</p>}
     {result && <>
       <p className="hint">{result.job === job ? "当前批次" : "上次发布的批次"} · {visible.length} 个知识点 · {result.paperCount ? "纳入 " + result.paperCount + " 份试卷" : "暂无试卷统计"}</p>
       <label>查看方式 <select value={view} onChange={e => setView(e.target.value)}>
         <option value="rank">真题频次</option><option value="chapters">章节目录</option>
+        <option value="plan">参考计划</option><option value="study">复习待办</option>
       </select></label>
-      {view === "rank" ? visible.map(detail) : Array.from(new Set(outline.map(r => r.topic.chapter))).map(chapter =>
+      {result.paperCount && visible.length ? <p><a href={"/api/course/versions/" + result.version + "/export"} download>下载 Markdown 复习文档</a></p>
+        : <p className="hint">{result.paperCount ? "暂无已确认命中的知识点可导出" : "暂无有效试卷可供导出"}</p>}
+      {view === "plan" && <ol>{plan.map(s => <li key={s.topic}><strong>{topics.get(s.topic)?.topic.name}</strong> · {s.reason} {s.ref && links([s.ref])}</li>)}</ol>}
+      {view === "study" && <Study key={result.version} version={result.version} rows={visible} detail={detail}/>}
+      {view === "rank" && visible.map(detail)}
+      {view === "chapters" && Array.from(new Set(outline.map(r => r.topic.chapter))).map(chapter =>
         <section key={chapter}><h3>{chapter}</h3>{outline.filter(r => r.topic.chapter === chapter).map(detail)}</section>)}
       {!visible.length && <p>{result.paperCount ? "本批试卷暂无已确认命中的知识点。" : "未提取到有依据的知识点。"}</p>}
       {!!result.reviews.length && <details><summary>待核对（{result.reviews.length}）</summary>
