@@ -27,10 +27,20 @@
   },
   "documents": [
     {
+      "path": "knowledge-base/m4-acceptance.md",
+      "title": "M4 课程参考视频 · 需求与验收",
+      "status": "active",
+      "status_reason": "用户审阅 M4 范围后要求进行开发。",
+      "verification_state": "verified",
+      "verified_on": "2026-11-25",
+      "verification_scope": "M4-01 至 M4-07 的需求和验收条件，以及文末记录的规则、故障和 BV 目录端到端实测。公开关键词搜索成功路径待验。",
+      "verification_evidence": ["2026-11-25 用户在收到范围、实施顺序和验收说明后回复“进行M4部分开发”。", "2026-11-25 公开搜索实测返回 HTTP 412 后，用户确认“允许增加手工维护的课程 BV 候选目录作为后备来源”，已对照修订后的实施顺序核验。", "2026-11-25 运行 m4-tests/VideoRulesTest.java、m4-tests/course.mjs 固定样例与 --live，Edge 确认第 8 讲实际标题；m3-tests/course.mjs 回归通过。"]
+    },
+    {
       "path": "knowledge-base/development-notes.md",
       "title": "开发问题与性能优化记录",
       "status": "draft",
-      "status_reason": "已记录 M3 笔记标签定位问题、修复和浏览器验证结果，待作为开发依据前核验。",
+      "status_reason": "已记录 M3 笔记定位与 M4 公开搜索受限的处理和验证情况，待作为开发依据前核验。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,

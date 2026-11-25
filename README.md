@@ -1,6 +1,19 @@
 # final-exam-agent
 期末保命
 
+## M4 课程参考视频
+
+运行 `./m1.ps1`，发布一次课程分析后，复习页底部的“B 站参考视频”会独立加载。系统使用课程名和参考计划中最多三个优先知识点查询公开接口，同一查询最多取三个候选做详情匹配。整门课合计最多展示三条。可定位到分 P 或合集单集时直接打开对应的一讲。播放、点赞和收藏按整条目标视频标注，共同可用的指标依次参与排序。
+
+公开搜索在本机验收时返回 HTTP 412。没有可用搜索候选时，系统会读取[课程 BV 目录](server/src/main/resources/video-catalog.json)，匹配实际标题或讲次，并在视频区标明来源。维护者可在课程名对应的数组中增补公开课程的 BV 号，重新构建服务后对失败或部分成功的查询点“重试视频检索”，或发布新分析。刷新会读取该版本已保存的结果。目录和搜索均不可用时，页面显示失败原因，其他复习操作仍可使用。
+
+用专用测试服务验证公开来源时，设置 `REVIEW_TEST_URL` 后运行 `node m4-tests/course.mjs --live`。该用例会上传自制资料、发布分析，并在 Edge 打开推荐。验证固定样例时，为专用后端追加 `--review.video-api=http://127.0.0.1:18442`，运行 `node m4-tests/course.mjs`；测试脚本在此端口模拟搜索拒绝、详情不可读、缺失指标和迟到结果。规则测试可在完成 Maven 构建后运行：
+
+```powershell
+javac -encoding UTF-8 -cp server/target/classes -d server/target/test-classes m4-tests/VideoRulesTest.java
+java -cp "server/target/classes;server/target/test-classes" local.review.VideoRulesTest
+```
+
 ## M3 复习计划、待办与 Markdown 导出
 
 运行下方的 `./m1.ps1` 并分析课程材料。在“查看方式”选“参考计划”，可以看到每一步的理由。讲义或课件明确写出“先求候选键，再判断第三范式”等先后关系时，计划会优先安排可见的前置点，并给出原文入口。当前通过文字规则识别明确表述；缺少依据或关系成环时沿用频次或章节顺序。旧版分析结果可直接使用，重新分析后可生成有出处的前置关系。

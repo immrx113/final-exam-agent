@@ -19,7 +19,7 @@ interface AnalysisMapper {
           + " version_id=#{version} GROUP BY topic")
   List<Counts> counts(String version);
 
-  @Update("UPDATE analysis_versions SET result_json=#{json} WHERE version_id=#{version}")
+  @Update("UPDATE analysis_versions SET result_json=#{json},video_status='queued' WHERE version_id=#{version}")
   void finish(String version, String json);
 
   @Select("SELECT version_id FROM analysis_versions ORDER BY seq DESC LIMIT 1")

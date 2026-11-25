@@ -1,5 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { Study } from "./Study";
+import { Videos } from "./Videos";
 
 type Question = { label: string; refs: string[] };
 export type Topic = {
@@ -95,6 +96,7 @@ export function Analysis({ job, ready }: { job: string; ready: boolean }) {
       {!!result.reviews.length && <details><summary>待核对（{result.reviews.length}）</summary>
         <ul>{result.reviews.map((r,i) => <li key={i}>{r.reason} {links(r.refs)}</li>)}</ul>
       </details>}
+      <Videos key={result.version} version={result.version}/>
     </>}
   </section>;
 }
