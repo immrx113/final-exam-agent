@@ -36,6 +36,10 @@ class Worker {
     try {
       var file = db.file(task.file());
       dir = Files.createTempDirectory("review-import-");
+      if (task.status().equals("recheck")) {
+        refreshText(task, dir);
+        return;
+      }
       Path input = dir.resolve("source." + Parser.extension(file.name()));
       try (var source = objects.open("original/" + file.digest())) {
         Files.copy(source, input);
@@ -56,7 +60,9 @@ class Worker {
             db.ready(task.job(), task.file(), prefix);
           });
     } catch (Exception e) {
-      db.fail(task.job(), task.file(), reason);
+      if (task.status().equals("recheck"))
+        db.finishRecheck(task.job(), task.file(), "重新识别失败，已保留上次结果，可重试");
+      else db.fail(task.job(), task.file(), reason);
     } finally {
       if (dir != null) {
         try (var paths = Files.walk(dir)) {
@@ -67,5 +73,37 @@ class Worker {
         }
       }
     }
+  }
+
+  private void refreshText(Catalog.Task task, Path dir) throws Exception {
+    var previous = db.segments(task.job(), task.file());
+    java.util.List<Catalog.Segment> refreshed;
+    if (parser.layoutAvailable()) {
+      var file = db.file(task.file());
+      Path input = dir.resolve("source." + Parser.extension(file.name()));
+      try (var in = objects.open("original/" + file.digest())) {
+        Files.copy(in, input);
+      }
+      refreshed = parser.rereadLayout(input, dir, previous);
+    } else {
+      refreshed = refreshPreviewText(task, dir, previous);
+    }
+    tx.executeWithoutResult(
+        status -> {
+          for (var s : refreshed) db.refreshSegment(task.job(), task.file(), s);
+          db.finishRecheck(task.job(), task.file(), null);
+        });
+  }
+
+  private java.util.List<Catalog.Segment> refreshPreviewText(
+      Catalog.Task task, Path dir, java.util.List<Catalog.Segment> previous) throws Exception {
+    String prefix = db.preview(task.job(), task.file());
+    var suspect = previous.stream().filter(s -> PageText.suspect(s.body())).toList();
+    for (var s : suspect) {
+      try (var in = objects.open(prefix + s.pos() + ".png")) {
+        Files.copy(in, dir.resolve(s.pos() + ".png"));
+      }
+    }
+    return parser.improve(suspect, dir);
   }
 }

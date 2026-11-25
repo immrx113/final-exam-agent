@@ -1,5 +1,10 @@
 name: final-review-m1
 services:
+  redis:
+    image: redis:7.4-alpine
+    ports:
+      - "127.0.0.1:36379:6379"
+    command: ["redis-server", "--save", "", "--appendonly", "no"]
   mysql:
     image: mysql:8.4
     environment:

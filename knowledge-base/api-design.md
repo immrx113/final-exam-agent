@@ -5,7 +5,7 @@
 ## 1. 公共约定
 
 - 业务根路径为 `/api/v1`。下文课程内的相对路径均接在 `/api/v1/courses/{course_id}` 后。ID 为不透明字符串，服务端校验资源归属。个人版由同源 React 调用本机 Java 服务。
-- 除文件上传和二进制响应外，请求、响应采用 UTF-8 JSON，字段使用 `snake_case`。列表放在 `items` 数组，空列表返回 `[]`。首版一次读取单门课的结果；时间为带时区的 ISO 8601 字符串。
+- 除文件上传、二进制响应和文档下载外，请求、响应采用 UTF-8 JSON，字段使用 `snake_case`。列表放在 `items` 数组，空列表返回 `[]`。首版一次读取单门课的结果；时间为带时区的 ISO 8601 字符串。
 - `job_id` 用于轮询某次分析，`version_id` 标识一次已经发布的课程结果，`topic_id` 是跨分析保留的知识点 ID。React 进入结果页时固定版本，后续请求沿用该版本。笔记和完成状态始终读取最近保存值。
 - 失败响应统一包含 `code`、面向用户的 `message`、布尔值 `retryable`、`request_id`；字段校验失败还返回 `fields` 数组，元素含 `field`、`reason`。常用状态码如下。
 
@@ -79,7 +79,7 @@ Job.status 依次为 queued、running，再进入 succeeded、partial 或 failed
 | `GET /todos` | 返回 exam_paper_count 和按频次排列的 items。每项含对应频次行的全部字段及 state。首次读取默认 state 为 completed=false、note 为空字符串、revision=0。 |
 | `GET /videos` | 返回 status、items、reason、retrieved_at。status 取 pending、running、ready、empty、failed；可用结果来自上次成功查询时，以 retrieved_at 标注时间。首次无结果时 items 为空、retrieved_at 为 null。 |
 | `POST /videos/retry` | 空请求体，202，返回与视频查询相同结构，调用方继续轮询。仅重跑该版本的视频查询，执行中的重复请求复用该次检索。 |
-| `GET /export` | 200，UTF-8 application/json 附件，文件名包含课程和版本。内容直接采用 PRD 第 6 节约定的顶层字段 schema_version、course、exam_paper_count、knowledge_points；逐点导出 id、chapter、name、text、question_count、matched_paper_count、sources、exam_evidence。 |
+| `GET /export` | 有已确认命中时返回 200 和 `text/markdown; charset=utf-8` 附件，文件名包含课程和版本，以 `.md` 结尾。按 PRD 第 6 节组织正文，仅写入命中题数大于零的知识点。没有符合条件的知识点时返回 204，无附件。 |
 
 **统计。** 同一题同一知识点只计一次，独立小问计入后父题不再重复计。只有 exam 类型中已采信的题目关联进入分子，覆盖数按不同试卷计。未纳入的卷不进入分母。无可用卷时分母为 0、两项命中数为 null；有卷但未命中时两项均为 0。知识点详情、待办与导出共用该版本的统计。导出来源映射为文件名及页码或其他定位，真题映射为试卷名、题号与定位；文件中的稳定 id 对应业务接口的 topic_id。导出字段采用白名单，仅含课程知识与依据。
 
@@ -142,4 +142,4 @@ Java 校验回传标识、非空证据数组、证据是否属于输入片段，
 2. 用三份试卷复现“函数依赖 4 题、1/3 份卷”与“关系代数 3 题、3/3 份卷”的排序。逐题从 exam_evidence 打开对应原页，导出后用稳定 ID 比对两个计数。
 3. 上传一个坏文件和一个可用文件，验证 partial、失败原因、原件下载和任务重试。轮询到新版本后仍可按旧版本 ID 获取旧统计。
 4. 创建无试卷的分析，再加入一份未命中某知识点的试卷，验证 null 与 0；切换版本后笔记与勾选仍在。模拟并发改笔记，过期 revision 返回 409。
-5. 模拟 Agent 返回未知片段 ID、重复批次和超时迟到响应，确认错误关联不会进入计数。模拟视频查询失败，核对原页、保存笔记及 JSON 导出仍可使用。
+5. 模拟 Agent 返回未知片段 ID、重复批次和超时迟到响应，确认错误关联不会进入计数。模拟视频查询失败，核对原页、保存笔记及 Markdown 导出仍可使用。

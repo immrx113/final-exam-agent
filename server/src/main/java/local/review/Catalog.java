@@ -11,7 +11,7 @@ interface Catalog {
 
   record Segment(int pos, String body, boolean review) {}
 
-  record Task(String job, String file) {}
+  record Task(String job, String file, String status) {}
 
   @Insert(
       "INSERT INTO files(id,name,role,digest) VALUES(#{id},#{name},#{role},#{digest}) ON DUPLICATE"
@@ -39,21 +39,39 @@ interface Catalog {
   List<Item> items(String job);
 
   @Select(
-      "SELECT i.job,i.file FROM items i JOIN jobs j ON j.id=i.job WHERE i.status='queued' ORDER BY"
-          + " j.seq,i.file LIMIT 1")
+      "SELECT i.job,i.file,i.status FROM items i JOIN jobs j ON j.id=i.job WHERE i.status IN"
+          + " ('queued','recheck') ORDER BY j.seq,i.file LIMIT 1")
   Task next();
 
   @Update(
-      "UPDATE items SET status='processing' WHERE job=#{job} AND file=#{file} AND status='queued'")
+      "UPDATE items SET status=IF(status='recheck','rechecking','processing') WHERE job=#{job} AND"
+          + " file=#{file} AND status=#{status}")
   int claim(Task task);
 
-  @Update("UPDATE items SET status='queued' WHERE status='processing'")
+  @Update(
+      "UPDATE items SET status=IF(status='rechecking','recheck','queued') WHERE status IN"
+          + " ('processing','rechecking')")
   void recover();
 
   @Update(
       "UPDATE items SET status='queued',reason=NULL WHERE job=#{job} AND file=#{file} AND"
           + " status='failed'")
   int retry(String job, String file);
+
+  @Update(
+      "UPDATE items SET status='recheck',reason=NULL WHERE job=#{job} AND file=#{file} AND"
+          + " status='ready'")
+  int recheck(String job, String file);
+
+  @Update(
+      "UPDATE items SET status='ready',reason=#{reason} WHERE job=#{job} AND file=#{file} AND"
+          + " status='rechecking'")
+  void finishRecheck(String job, String file, String reason);
+
+  @Update(
+      "UPDATE segments SET body=#{s.body},review=#{s.review} WHERE job=#{job} AND file=#{file} AND"
+          + " pos=#{s.pos}")
+  void refreshSegment(String job, String file, Segment s);
 
   @Insert(
       "INSERT INTO segments(job,file,pos,body,review)"
@@ -69,6 +87,8 @@ interface Catalog {
   @Update("UPDATE items SET status='failed',reason=#{reason} WHERE job=#{job} AND file=#{file}")
   void fail(String job, String file, String reason);
 
-  @Select("SELECT preview FROM items WHERE job=#{job} AND file=#{file} AND status='ready'")
+  @Select(
+      "SELECT preview FROM items WHERE job=#{job} AND file=#{file} AND status IN"
+          + " ('ready','recheck','rechecking')")
   String preview(String job, String file);
 }

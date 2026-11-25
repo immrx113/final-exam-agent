@@ -128,6 +128,15 @@ class ImportApi {
 
   record Source(String id, int pos, String body, boolean review, String label, String url) {}
 
+  @PostMapping(value = "/jobs/{job}/{file}/recheck", headers = "X-Review-Request=1")
+  void recheck(@PathVariable UUID job, @PathVariable String file) {
+    var row = db.file(file);
+    if (row == null || !Set.of("page", "rendered").contains(Parser.kind(row.name())))
+      throw invalid();
+    if (db.recheck(job.toString(), file) != 1)
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+  }
+
   @GetMapping("/jobs/{job}/{file}/segments")
   List<Source> segments(@PathVariable UUID job, @PathVariable String file) {
     var f = db.file(file);

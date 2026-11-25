@@ -6,7 +6,7 @@ import { setTimeout as wait } from "node:timers/promises";
 
 const directory = process.argv[2];
 if (!directory) throw Error("Pass an M0 sample directory.");
-const base = "http://127.0.0.1:8080";
+const base = process.env.REVIEW_TEST_URL || "http://127.0.0.1:8080";
 const api = base + "/api/course/";
 const entries = [
   ["lesson.ppt.pdf", "courseware", 2, "函数依赖"],

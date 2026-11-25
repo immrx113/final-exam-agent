@@ -1,4 +1,4 @@
-param([Parameter(Mandatory)][string]$ImagePath)
+param([string]$ImagePath, [string]$PageList)
 $ErrorActionPreference = 'Stop'
 [Console]::OutputEncoding = [Text.UTF8Encoding]::new($false)
 Add-Type -AssemblyName System.Runtime.WindowsRuntime
@@ -14,13 +14,25 @@ function Await-Result($operation, $type) {
     $task = $asTask.MakeGenericMethod($type).Invoke($null, @($operation))
     $task.GetAwaiter().GetResult()
 }
-$file = Await-Result ([Windows.Storage.StorageFile]::GetFileFromPathAsync((Resolve-Path $ImagePath).Path)) ([Windows.Storage.StorageFile])
+$engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage([Windows.Globalization.Language]::new('zh-Hans'))
+if (!$engine) { throw 'Windows Simplified Chinese OCR language pack is required.' }
+function Read-Page([string]$path) {
+$file = Await-Result ([Windows.Storage.StorageFile]::GetFileFromPathAsync((Resolve-Path -LiteralPath $path).Path)) ([Windows.Storage.StorageFile])
 $stream = Await-Result ($file.OpenReadAsync()) ([Windows.Storage.Streams.IRandomAccessStreamWithContentType])
 try {
     $decoder = Await-Result ([Windows.Graphics.Imaging.BitmapDecoder]::CreateAsync($stream)) ([Windows.Graphics.Imaging.BitmapDecoder])
     $bitmap = Await-Result ($decoder.GetSoftwareBitmapAsync()) ([Windows.Graphics.Imaging.SoftwareBitmap])
-    $engine = [Windows.Media.Ocr.OcrEngine]::TryCreateFromLanguage([Windows.Globalization.Language]::new('zh-Hans'))
-    if (!$engine) { throw 'Windows Simplified Chinese OCR language pack is required.' }
-    $result = Await-Result ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
-    foreach ($line in $result.Lines) { [Console]::WriteLine($line.Text) }
+    try {
+        $result = Await-Result ($engine.RecognizeAsync($bitmap)) ([Windows.Media.Ocr.OcrResult])
+        foreach ($line in $result.Lines) { $line.Text }
+    } finally { $bitmap.Dispose() }
 } finally { $stream.Dispose() }
+}
+if ($PageList) {
+    foreach ($path in [IO.File]::ReadAllLines($PageList)) {
+        try {
+            $lines = @(Read-Page $path)
+            [IO.File]::WriteAllLines("$path.txt", [string[]]$lines, [Text.UTF8Encoding]::new($false))
+        } catch { [Console]::Error.WriteLine('Page recognition failed') }
+    }
+} else { Read-Page $ImagePath | ForEach-Object { [Console]::WriteLine($_) } }

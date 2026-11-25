@@ -165,3 +165,5 @@ select {
     padding: 14px;
   }
 }
+.evidence-link { display: inline-block; margin: .15rem .5rem .15rem 0; }
+.topic summary { cursor: pointer; padding: .45rem 0; }

@@ -18,6 +18,38 @@ import org.springframework.web.util.HtmlUtils;
 class Parser {
   private final String office;
   private final Path ocr;
+  private MinerU layout;
+
+  @Value("${review.mineru-url:http://127.0.0.1:8000}")
+  void configureLayout(String endpoint) {
+    layout = endpoint.isBlank() ? null : new MinerU(endpoint);
+  }
+
+  boolean layoutAvailable() {
+    return layout != null && layout.available();
+  }
+
+  List<Catalog.Segment> rereadLayout(Path input, Path dir, List<Catalog.Segment> previous)
+      throws Exception {
+    Path pdf = kind(input.toString()).equals("page") ? input : convertOffice(input, dir);
+    try (var document = Loader.loadPDF(pdf.toFile())) {
+      if (document.getNumberOfPages() != previous.size()) throw new IOException("预览页数已改变");
+    }
+    return readLayout(pdf, previous, true);
+  }
+
+  private List<Catalog.Segment> readLayout(Path pdf, List<Catalog.Segment> previous, boolean force)
+      throws IOException {
+    var parsed = layout.parse(pdf, previous.size(), force);
+    var result = new ArrayList<Catalog.Segment>();
+    for (var p : parsed) {
+      result.add(
+          p.body().isBlank()
+              ? new Catalog.Segment(p.pos(), previous.get(p.pos() - 1).body(), true)
+              : p);
+    }
+    return result;
+  }
 
   Parser(@Value("${review.office}") String office, @Value("${review.ocr}") String ocr) {
     this.office = office;
@@ -42,21 +74,23 @@ class Parser {
       case "line" -> markdown(input, dir);
       case "image" -> image(input, dir);
       case "page" -> pdf(input, dir);
-      default -> {
-        execute(
-            dir,
-            90,
-            office,
-            "-env:UserInstallation=" + dir.resolve("profile").toUri(),
-            "--headless",
-            "--convert-to",
-            "pdf",
-            "--outdir",
-            dir.toString(),
-            input.toString());
-        yield pdf(dir.resolve("source.pdf"), dir);
-      }
+      default -> pdf(convertOffice(input, dir), dir);
     };
+  }
+
+  private Path convertOffice(Path input, Path dir) throws Exception {
+    execute(
+        dir,
+        90,
+        office,
+        "-env:UserInstallation=" + dir.resolve("profile").toUri(),
+        "--headless",
+        "--convert-to",
+        "pdf",
+        "--outdir",
+        dir.toString(),
+        input.toString());
+    return dir.resolve("source.pdf");
   }
 
   private List<Catalog.Segment> markdown(Path input, Path dir) throws IOException {
@@ -112,11 +146,50 @@ class Parser {
         float dimension = Math.max(box.getWidth(), box.getHeight());
         float dpi = Math.min(144, 3000f * 72 / Math.max(1, dimension));
         ImageIO.write(renderer.renderImageWithDPI(page - 1, dpi), "png", image.toFile());
-        result.add(
-            text.isEmpty() ? recognize(image, page, dir) : new Catalog.Segment(page, text, false));
+        result.add(new Catalog.Segment(page, text, false));
       }
     }
-    return result;
+    if (layoutAvailable())
+      return readLayout(input, result, result.stream().anyMatch(p -> PageText.suspect(p.body())));
+    return improve(result, dir);
+  }
+
+  List<Catalog.Segment> improve(List<Catalog.Segment> pages, Path dir) throws Exception {
+    var pending = pages.stream().filter(p -> PageText.suspect(p.body())).toList();
+    if (pending.isEmpty()) return pages;
+    Map<Integer, Catalog.Segment> replacements = new HashMap<>();
+    Path manifest = dir.resolve("ocr-pages.txt");
+    for (int start = 0; start < pending.size(); start += 16) {
+      var batch = pending.subList(start, Math.min(start + 16, pending.size()));
+      Files.write(
+          manifest, batch.stream().map(p -> dir.resolve(p.pos() + ".png").toString()).toList());
+      try {
+        execute(
+            dir,
+            45 * batch.size(),
+            "powershell.exe",
+            "-NoProfile",
+            "-NonInteractive",
+            "-ExecutionPolicy",
+            "Bypass",
+            "-File",
+            ocr.toString(),
+            "-PageList",
+            manifest.toString());
+      } catch (IOException ignored) {
+        /* Keep readable source text and flag incomplete pages. */
+      }
+      for (var original : batch) {
+        Path output = dir.resolve(original.pos() + ".png.txt");
+        String read = Files.exists(output) ? PageText.fromOcr(Files.readString(output)) : "";
+        boolean uncertain = PageText.suspect(read) || read.replaceAll("\\s", "").length() < 8;
+        replacements.put(
+            original.pos(),
+            new Catalog.Segment(
+                original.pos(), read.isBlank() ? PageText.body(original.body()) : read, uncertain));
+      }
+    }
+    return pages.stream().map(p -> replacements.getOrDefault(p.pos(), p)).toList();
   }
 
   private Catalog.Segment recognize(Path image, int page, Path dir) throws InterruptedException {

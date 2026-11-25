@@ -1,6 +1,7 @@
 import React, { useEffect, useState } from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
+import { Analysis } from "./Analysis";
 
 const roles = { courseware: "课件", material: "资料", exam: "试卷" } as const;
 type Role = keyof typeof roles;
@@ -10,7 +11,7 @@ type Item = {
   file: string;
   name: string;
   role: Role;
-  status: "queued" | "processing" | "ready" | "failed";
+  status: "queued" | "processing" | "ready" | "failed" | "recheck" | "rechecking";
   reason: string | null;
 };
 type Source = {
@@ -24,6 +25,8 @@ type Source = {
 const labels = {
   queued: "排队中",
   processing: "处理中",
+  recheck: "等待重新识别",
+  rechecking: "正在重新识别",
   ready: "已完成",
   failed: "处理失败",
 };
@@ -191,9 +194,9 @@ function App() {
       setBusy(false);
     }
   }
-  async function retry(file: string) {
+  async function retry(file: string, action = "retry") {
     try {
-      await api("jobs/" + job + "/" + file + "/retry", { method: "POST" });
+      await api("jobs/" + job + "/" + file + "/" + action, { method: "POST" });
       setTick((v) => v + 1);
       setError("");
     } catch (e) {
@@ -332,6 +335,7 @@ function App() {
             </select>
           </div>
           {pollError && <p role="alert">{pollError}，正在重新连接</p>}
+          {job && <Analysis key={job} job={job} ready={!busy && items.some(i => i.status === "ready") && items.every(i => i.status === "ready" || i.status === "failed")} />}
           {items.map((i) => (
             <article key={job + i.file}>
               <div className="bar">
@@ -347,7 +351,11 @@ function App() {
                   <button onClick={() => retry(i.file)}>重试此文件</button>
                 </p>
               )}
-              {i.status === "ready" && <Evidence job={job} item={i} />}
+              {i.status === "ready" && <>
+                <Evidence job={job} item={i} />
+                {/\.(pdf|pptx?|docx?)$/i.test(i.name) && <button className="sub" onClick={() => retry(i.file, "recheck")}>重新识别正文</button>}
+                {i.reason && <p role="alert">{i.reason}</p>}
+              </>}
             </article>
           ))}
         </section>

@@ -27,6 +27,16 @@
   },
   "documents": [
     {
+      "path": "knowledge-base/development-notes.md",
+      "title": "开发问题与性能优化记录",
+      "status": "draft",
+      "status_reason": "已建立项目亮点记录模板，待积累实际案例并核验。",
+      "verification_state": "unverified",
+      "verified_on": null,
+      "verification_scope": null,
+      "verification_evidence": []
+    },
+    {
       "path": "knowledge-base/m0-results.md",
       "title": "M0 可行性验证实测记录",
       "status": "draft",
@@ -40,11 +50,13 @@
       "path": "knowledge-base/personal-review-requirements.md",
       "title": "个人期末复习助手 · 首版需求",
       "status": "active",
-      "status_reason": "用户已确认首版三项默认值并指定三个上传区域，已核验范围可作为产品需求依据。",
+      "status_reason": "用户已确认首版默认值、上传区域、零命中显示规则，以及更新后的导出格式与筛选规则。",
       "verification_state": "verified",
-      "verified_on": "2026-11-24",
-      "verification_scope": "仅核验产品需求：课件、资料、试卷三个独立上传区；考点按命中题数降序并显示试卷覆盖数；整门课推荐 1～3 个相关视频，依次按播放量、点赞数、收藏数降序；笔记附在待办项，默认 JSON 导出课程知识与真题依据。实现行为、B 站接口可行性及其他细化规则不在本次核验范围内。",
+      "verified_on": "2026-11-25",
+      "verification_scope": "仅核验产品需求：有效试卷下隐藏零命中项；课件、资料、试卷三个独立上传区；考点按命中题数降序并显示试卷覆盖数；整门课推荐 1～3 个相关视频，依次按播放量、点赞数、收藏数降序；笔记附在待办项，Markdown 文档导出课程知识与真题依据，排除零命中知识点。实现行为、B 站接口可行性及其他细化规则不在本次核验范围内。",
       "verification_evidence": [
+        "2026-11-25 用户明确：“导出的json文件改为markdown文档，0命中知识点不支持导出”。已对照首版需求第 6 节及导出验收条目复核格式与筛选规则。",
+        "2026-11-25 用户明确：如果知识点在试卷中出现的次数是0次，就不用显示。",
         "2026-11-24 本项目需求讨论：助手逐项列出频率排序、视频数量和排序、笔记及导出三个默认值，用户回复“默认值都确认”。",
         "同次用户确认：“第一步上传文件时，设置分别上传课件，资料和试卷，三个上传部分”。"
       ]
@@ -53,7 +65,7 @@
       "path": "knowledge-base/architect.md",
       "title": "个人期末复习助手 · 技术选型与开发规划",
       "status": "draft",
-      "status_reason": "用户已选定 React + TypeScript、Spring Boot、MyBatis、MySQL、Redis 和 MinIO，Python 仅用于 Agent。架构已记录对象存储和 Mapper 数据访问方案，部署与运行效果待实测。",
+      "status_reason": "用户已选定 React + TypeScript、Spring Boot、MyBatis、MySQL、Redis 和 MinIO，Python 仅用于 Agent。已同步 Markdown 导出要求。架构已记录对象存储和 Mapper 数据访问方案，部署与运行效果待实测。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,
@@ -63,7 +75,7 @@
       "path": "knowledge-base/api-design.md",
       "title": "个人期末复习助手 · 首版接口设计",
       "status": "draft",
-      "status_reason": "依据已确认产品口径和技术分工拟定业务 API 与 Agent 批次契约，字段、错误处理和联调场景待评审与实测。",
+      "status_reason": "依据已确认产品口径和技术分工拟定业务 API 与 Agent 批次契约，已同步 Markdown 导出要求，字段、错误处理和联调场景待评审与实测。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,
@@ -71,9 +83,29 @@
     },
     {
       "path": "knowledge-base/m1-acceptance.md",
-      "title": "M1 需求与测试用例生成输入",
+      "title": "M1 需求与验收场景",
       "status": "draft",
-      "status_reason": "依据本轮已同意的 M1 范围整理，供独立测试设计与复核。",
+      "status_reason": "依据已同意的 M1 范围整理，供开发者设计用例和逐项复核，待核验。",
+      "verification_state": "unverified",
+      "verified_on": null,
+      "verification_scope": null,
+      "verification_evidence": []
+    },
+    {
+      "path": "knowledge-base/m2-acceptance.md",
+      "title": "M2 需求与验收",
+      "status": "active",
+      "status_reason": "用户已确认 M2 范围，后续明确有试卷时隐藏零命中项。本阶段仅划分导出归属，具体格式见首版需求。",
+      "verification_state": "verified",
+      "verified_on": "2026-11-25",
+      "verification_scope": "包含 M2-06 的零命中显示规则。M2 的开发目标、开发分工与 M2-01 至 M2-08 验收条件。实现与实测结果另行核验。",
+      "verification_evidence": ["2026-11-25 用户明确：如果知识点在试卷中出现的次数是0次，就不用显示。", "2026-11-24 对照本次需求讨论和随附草案，用户回复“进行开发吧”。"]
+    },
+    {
+      "path": "knowledge-base/m3-acceptance.md",
+      "title": "M3 学习与导出 · 需求与验收草案",
+      "status": "draft",
+      "status_reason": "用户已确认 Markdown 导出和零命中排除规则，其余 M3 细则待确认并核验。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,
