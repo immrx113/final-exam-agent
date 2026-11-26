@@ -27,6 +27,19 @@
   },
   "documents": [
     {
+      "path": "knowledge-base/frontend-refactor-plan.md",
+      "title": "个人期末复习助手 · 前端重构开发规划",
+      "status": "active",
+      "status_reason": "用户已确认前端重构方案并启动分步开发，Task 1 已完成实施与实测核验，Task 2～4 待实施后扩充核验范围。",
+      "verification_state": "verified",
+      "verified_on": "2026-11-26",
+      "verification_scope": "重构总体设计决策及 Task 1（dual-track-workspace：双轨状态解耦、自适应导入台、批次与版本铭牌、同级视频区挂载）的设计与浏览器实测结果。Task 2 至 Task 4 的实现及写库全量回归待后续核验。",
+      "verification_evidence": [
+        "2026-11-26 用户审阅 Task 1 的范围、实施步骤与完成标准后回复“开始开发”。",
+        "2026-11-26 执行 npm.cmd run build --prefix web、本地 Maven 打包、m2-tests/visibility.mjs 回归，以及 Edge 无头验证首次引导、快捷导入条、跨批次切换与 504 超时状态隔离、精确标签匹配和 390px 窄屏防溢出均通过。"
+      ]
+    },
+    {
       "path": "knowledge-base/m5-acceptance.md",
       "title": "M5 个人电脑试用 · 需求与验收",
       "status": "active",
@@ -50,7 +63,7 @@
       "path": "knowledge-base/development-notes.md",
       "title": "开发问题与性能优化记录",
       "status": "draft",
-      "status_reason": "已记录 M3 笔记定位、M4 公开搜索受限及 M5 扫描卷归属问题，待作为开发依据前核验。",
+      "status_reason": "已记录 M3 笔记定位、M4 公开搜索受限、M5 扫描卷归属及前端重构文件选择标签精确匹配问题，待作为开发依据前核验。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,
