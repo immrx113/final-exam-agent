@@ -1,19 +1,19 @@
 name: final-review-m1
 services:
   redis:
-    image: redis:7.4-alpine
+    image: redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
     ports:
-      - "127.0.0.1:36379:6379"
+      - "127.0.0.1:${REVIEW_REDIS_PORT:-36379}:6379"
     command: ["redis-server", "--save", "", "--appendonly", "no"]
   mysql:
-    image: mysql:8.4
+    image: mysql:8.4@sha256:8c233bad33d520a7aae1c1e619c3a9775f4a1ba2d463d692fada04ec7f40be00
     environment:
       MYSQL_DATABASE: review
       MYSQL_USER: review
       MYSQL_PASSWORD: ${REVIEW_DB_PASSWORD:?set REVIEW_DB_PASSWORD}
       MYSQL_ROOT_PASSWORD: ${REVIEW_DB_ROOT_PASSWORD:?set REVIEW_DB_ROOT_PASSWORD}
     ports:
-      - "127.0.0.1:33306:3306"
+      - "127.0.0.1:${REVIEW_MYSQL_PORT:-33306}:3306"
     healthcheck:
       test: ["CMD", "mysqladmin", "ping", "-h", "127.0.0.1"]
       interval: 3s
@@ -28,7 +28,7 @@ services:
       MINIO_ROOT_USER: ${REVIEW_OBJECT_USER:?set REVIEW_OBJECT_USER}
       MINIO_ROOT_PASSWORD: ${REVIEW_OBJECT_PASSWORD:?set REVIEW_OBJECT_PASSWORD}
     ports:
-      - "127.0.0.1:39000:9000"
+      - "127.0.0.1:${REVIEW_MINIO_PORT:-39000}:9000"
     volumes:
       - object-data:/bitnami/minio/data
 volumes:

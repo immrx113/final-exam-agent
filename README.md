@@ -1,6 +1,38 @@
 # final-exam-agent
 期末保命
 
+## M5 Windows 单课程试用
+
+安装 PowerShell 7.4+、JDK 21、Maven 3.9、Node.js 22.12+、Python 3.10+、LibreOffice 和 Windows 简体中文 OCR 语言包。启动 Docker Desktop 并切换到 Linux 容器。将 `java`、`mvn`、`npm.cmd`、`python`、`docker` 放在 PATH 中。默认安装位置和 PATH 中的 LibreOffice 均可自动找到，其他位置用 `-Office` 指定。
+
+在仓库根目录的 PowerShell 7 终端运行以下命令。首次启动需联网下载构建依赖和镜像。此路径使用 PDF 文本层、LibreOffice 固定版预览和 Windows OCR；规则分析可在没有语义模型的电脑上运行。
+
+```powershell
+$env:REVIEW_SEMANTIC = '0'
+./m1.ps1 -Trial -BasicParsing
+```
+
+打开[独立试用课程](http://127.0.0.1:18085)。试用模式使用 Docker 项目 `final-review-m5`、独立数据卷和随机生成的 `.local/m5.env`。MySQL、MinIO、Redis 分别绑定本机 33315、39015、36385 端口。保留凭据文件和数据卷即可续用。常规课程仍从 8080 进入。
+
+1. 在课件、资料、试卷三个区选取材料，点击“提交处理”，等解析结束后点“分析本批资料”。单张扫描图归属不明时可以打开原图核对；已知属于同一卷的扫描页可按原顺序整理为一份 PDF。
+2. 在“真题频次”展开考点，核对每道题和教学出处。在“参考计划”看学习顺序，再去“复习待办”勾选、写笔记并保存。点击“下载 Markdown 复习文档”取得当前版本的正命中考点和逐题依据。
+3. 追加材料时，在“已上传文件”勾选要复用的文件，与新材料一起提交。分析中断后，重开页面，在“处理批次”选择原批次，点“分析本批资料”重试。可继续查看上次成功发布的结果。
+4. 前台按 Ctrl+C 结束 Java，再运行 `docker compose -p final-review-m5 --env-file .local/m5.env stop` 停止试用存储。代码未变时用 `./m1.ps1 -Trial -BasicParsing -SkipBuild` 重开。
+
+**复跑自制课程验收。** 保持上述服务运行，在第二个 PowerShell 7 终端进入仓库根目录。浏览器测试需要 Edge。下列用例会向 18085 专用课程发布分析并写入试用笔记。恢复用例另用 18086，只中断自己启动的 Java，清除该版本的一个试用缓存键。样本生成器使用 `soffice.com`；如果它不在 PATH，给第一条命令追加 `-Office '<soffice.com 的完整路径>'`。
+
+```powershell
+./m5-tests/samples.ps1
+node m5-tests/course.mjs
+$env:REVIEW_TEST_URL = 'http://127.0.0.1:18085'
+node m4-tests/course.mjs --live --current
+node m5-tests/recovery.mjs
+$env:REVIEW_SEMANTIC = '0'
+python m5-tests/holdout.py
+```
+
+生成的课件、讲义、三份样卷和一张散页在 `.local/m5-samples`。人工答案和逐题断言在 [M5 课程用例](m5-tests/course.mjs)，机器配置、耗时、质量基线及视频服务限制见 [M5 逐项验收记录](knowledge-base/m5-acceptance.md)。
+
 ## M4 课程参考视频
 
 运行 `./m1.ps1`，发布一次课程分析后，复习页底部的“B 站参考视频”会独立加载。系统使用课程名和参考计划中最多三个优先知识点查询公开接口，同一查询最多取三个候选做详情匹配。整门课合计最多展示三条。可定位到分 P 或合集单集时直接打开对应的一讲。播放、点赞和收藏按整条目标视频标注，共同可用的指标依次参与排序。

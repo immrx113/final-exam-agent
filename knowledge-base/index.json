@@ -27,6 +27,16 @@
   },
   "documents": [
     {
+      "path": "knowledge-base/m5-acceptance.md",
+      "title": "M5 个人电脑试用 · 需求与验收",
+      "status": "active",
+      "status_reason": "用户确认 M5 试用方案后已完成自制课程及中断恢复验收。",
+      "verification_state": "verified",
+      "verified_on": "2026-11-26",
+      "verification_scope": "M5-01 至 M5-06 的需求、同一台 Windows 机器的自制课程试用、故障恢复及独立卷基线。公开关键词搜索成功路径及另一台新机安装待验。",
+      "verification_evidence": ["用户在收到阶段范围、实现顺序和通过条件后回复“开始M5阶段开发”。", "本机完整构建与存储停启；Edge 实测 m5-tests/course.mjs、recovery.mjs，m4-tests/course.mjs 的模拟故障与真实后备链接，M2/M3 浏览器回归、8 项 Agent 回归，以及 m5-tests/holdout.py 两种配置的独立卷基线。"]
+    },
+    {
       "path": "knowledge-base/m4-acceptance.md",
       "title": "M4 课程参考视频 · 需求与验收",
       "status": "active",
@@ -40,7 +50,7 @@
       "path": "knowledge-base/development-notes.md",
       "title": "开发问题与性能优化记录",
       "status": "draft",
-      "status_reason": "已记录 M3 笔记定位与 M4 公开搜索受限的处理和验证情况，待作为开发依据前核验。",
+      "status_reason": "已记录 M3 笔记定位、M4 公开搜索受限及 M5 扫描卷归属问题，待作为开发依据前核验。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,

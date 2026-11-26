@@ -46,7 +46,9 @@ try {
     return (await analysis.json()).version;
   }
   const lesson="# 数据库基础\n关系代数：用于表达关系查询的运算体系。\n候选键：能够唯一标识元组的最小属性集合。";
-  const version=await publish(lesson,"第1题 解释关系代数。");
+  const version=live && process.argv.includes("--current")
+    ? (await (await page.request.get(base+"/api/course/analysis")).json()).version
+    : await publish(lesson,"第1题 解释关系代数。");
   const video=page.getByRole("region",{name:"B 站参考视频"});
   if(live) {
     const link=video.getByRole("link").first();

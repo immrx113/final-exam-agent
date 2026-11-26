@@ -101,7 +101,7 @@ function App() {
   const [tick, setTick] = useState(0);
   const [reload, setReload] = useState(0);
   function selectJob(id: string) {
-    setItems([]);
+    if (id !== job) setItems([]);
     setJob(id);
     sessionStorage.setItem("selected-job", id);
   }
