@@ -61,7 +61,7 @@ try {
   await original.waitForLoadState();
   assert.match(await original.locator(":target").innerText(), /函数依赖/);
   await original.close();
-  await page.getByLabel("查看方式").selectOption("chapters");
+  await page.getByRole("tab", { name: /^章节目录/ }).click();
   await page.getByRole("heading",{name:"关系数据理论"}).waitFor();
   const again = await run();
   assert.deepEqual(again.ranked,first.ranked);

@@ -105,6 +105,13 @@ export type Snapshot = {
   reviews: ReviewItem[];
 };
 
+export type StudyState = {
+  topic: string;
+  revision: number;
+  completed: boolean;
+  note: string;
+};
+
 export type ActiveEvidence = {
   key: string;
   topicId: string;

@@ -26,6 +26,12 @@
 - **解决方案**：移除含字符文本的装饰 `<span>`，改用不含任何文本节点的矢量 `<svg aria-hidden="true">` 绘制加号图标，并保证同一时刻 DOM 仅渲染展开态或收缩态中的唯一一组 `<label>`。
 - **验证结果**：重新执行 `npm.cmd run build --prefix web` 并在无头 Edge 下验证首次引导三栏展开态与已发布单行快捷导入态，`getByLabel("选择课件" | "选择资料" | "选择试卷", { exact: true })` 均唯一命中 1 个控件，视觉加号图标正常显示。
 
+## 2026-11-26 · 四页签与参考计划原地展开下的严格定位器隔离
+
+- **背景与问题**：在 Task 3（`tabs-plan-study`）升级四页签、为参考计划增加原地展开考点卡片及升级 409 冲突双栏框时，既有浏览器用例存在三处严格 DOM 约束：（1）`m2-tests/visibility.mjs` 使用 `.allTextContents()` 读取 `.topic summary strong`，若用 `hidden` 保活非激活页签面板会把隐藏面板中的节点一并计入；（2）`m3-tests/course.mjs` 使用严格模式 `plan.first().locator("a").innerText()` 读取前置讲义链接，若在步骤内默认挂载折叠的 `<details class="topic">`，其内部真题与出处 `<a>` 仍存在于 DOM 中导致匹配多元素报错；（3）冲突框标题与底部状态栏若重复输出“其他页面已更新”，会触发 `getByText(/其他页面已更新/)` 严格模式冲突。
+- **解决方案**：将学习记录 `states`、草稿 `drafts` 与冲突标记上提至 `Analysis.tsx` 按 `version` 维护，同时对非激活 `tabpanel` 和未展开的计划步骤详情采用条件渲染（收起时不挂载内联 `.topic` 节点），冲突提示统一由 `.conflict-title[role="status"]` 单点承载。
+- **验证结果**：运行 `m2-tests/visibility.mjs` 及无头 Edge 验证脚本，确认计划步骤默认态下 `plan.first().locator("a")` 唯一匹配前置链接、展开态下支持页内对照与 `Esc` 归还焦点、跨页签切换不丢草稿与冲突核对状态。
+
 ## 条目模板
 
 - **日期与模块**：问题发生在哪个阶段、哪个功能或模块？

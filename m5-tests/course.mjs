@@ -68,16 +68,15 @@ try {
   await verify(await publish(false));
   const result = await publish(true);
   const rows = await verify(result);
-  const view = page.getByLabel("查看方式");
   assert.deepEqual(await page.locator(".topic summary strong").allTextContents(), Object.keys(truth));
   const algebra = page.locator(".topic").filter({has:page.getByText("关系代数",{exact:true})});
   await algebra.locator("summary").click();
   const [scan] = await Promise.all([page.waitForEvent("popup"),algebra.getByRole("link",{name:"丙卷.pdf · 原文第 1 页"}).click()]);
   await scan.waitForFunction(()=>document.images[0]?.naturalWidth>0);
   await scan.close();
-  await view.selectOption("plan");
+  await page.getByRole("tab", { name: /^参考计划/ }).click();
   assert.ok((await page.locator("ol li").first().innerText()).includes(result.plan[0].reason));
-  await view.selectOption("study");
+  await page.getByRole("tab", { name: /^复习待办/ }).click();
   const item = page.locator(".study-item").filter({has:page.getByLabel("学习笔记 · 函数依赖",{exact:true})});
   const saved = async action => {
     const [r] = await Promise.all([page.waitForResponse(r=>r.request().method()==="PUT"),action()]);
@@ -88,7 +87,7 @@ try {
   await item.locator("textarea").fill(note);
   await saved(()=>item.getByRole("button",{name:"保存笔记"}).click());
   await page.reload();
-  await view.selectOption("study");
+  await page.getByRole("tab", { name: /^复习待办/ }).click();
   assert.equal(await item.locator("textarea").inputValue(),note);
   assert.ok(await item.getByRole("checkbox").isChecked());
   const [download] = await Promise.all([page.waitForEvent("download"),page.getByText("下载 Markdown 复习文档").click()]);

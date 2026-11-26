@@ -36,7 +36,8 @@ try {
     assert.equal(response.status(),200,await response.text());
     return response.json();
   }
-  const view = (p,name) => p.getByLabel("查看方式").selectOption(name);
+  const tabs = { rank: /^真题频次/, chapters: /^章节目录/, plan: /^参考计划/, study: /^复习待办/ };
+  const view = (p,name) => p.getByRole("tab", { name: tabs[name] }).click();
   const item = p => p.locator(".study-item").filter({has:p.getByLabel("学习笔记 · 候选键",{exact:true})});
   const saved = async (p,action,code=200) => {
     const [response] = await Promise.all([p.waitForResponse(r=>r.request().method()==="PUT"),action()]);

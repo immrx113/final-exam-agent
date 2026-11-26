@@ -59,9 +59,9 @@ try {
     console.log("真实检索结果",await video.innerText(),tab.url(),await tab.title());
   } else {
     await video.getByText("正在检索参考视频…").waitFor();
-    await page.getByLabel("查看方式").selectOption("chapters");
+    await page.getByRole("tab", { name: /^章节目录/ }).click();
     await page.getByText("关系代数",{exact:true}).first().waitFor();
-    await page.getByLabel("查看方式").selectOption("study");
+    await page.getByRole("tab", { name: /^复习待办/ }).click();
     const check=page.locator(".study-item input[type=checkbox]").first();
     await check.click();
     const note=page.getByLabel("学习笔记 · 关系代数",{exact:true});
@@ -74,7 +74,7 @@ try {
     assert.match(download.suggestedFilename(),/\.md$/);
     const before=searches;
     await page.reload();
-    await page.getByLabel("查看方式").selectOption("study");
+    await page.getByRole("tab", { name: /^复习待办/ }).click();
     await video.getByText(/HTTP 412/).waitFor();
     assert.equal(await note.inputValue(),noteText);
     assert.equal(searches,before);

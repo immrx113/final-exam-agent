@@ -23,8 +23,8 @@ try {
     await page.goto(base);
     const section = page.getByRole("region", { name: "课程分析" });
     await section.getByText(new RegExp(expected.length + " 个知识点")).waitFor();
-    for (const view of ["rank", "chapters"]) {
-      await section.getByLabel("查看方式").selectOption(view);
+    for (const [view, label] of [["rank", /^真题频次/], ["chapters", /^章节目录/]]) {
+      await section.getByRole("tab", { name: label }).click();
       assert.deepEqual(await section.locator(".topic summary strong").allTextContents(), expected);
       if (view === "chapters") assert.equal(await section.locator("h3").count(), expected.length);
       if (!expected.length) await section.getByText("本批试卷暂无已确认命中的知识点。").waitFor();

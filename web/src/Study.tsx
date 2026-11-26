@@ -1,71 +1,232 @@
-import { useEffect, useState, type ReactNode } from "react";
-import type { Topic } from "./Analysis";
+import { useState, type ReactNode } from "react";
+import type { StudyState, Topic } from "./types";
 
-type State = { topic: string; revision: number; completed: boolean; note: string };
 type Fields = { completed?: boolean; note?: string };
 
-function StudyItem({ row, initial, url, children }: {
-  row: Topic; initial?: State; url: string; children: ReactNode;
-}) {
-  const [state, setState] = useState<State>(initial ?? {topic: row.id, revision: 0, completed: false, note: ""});
-  const [draft, setDraft] = useState(state.note);
+type StudyItemProps = {
+  row: Topic;
+  initial?: StudyState;
+  draftOverride?: string;
+  conflict: boolean;
+  url: string;
+  onStateChange: (next: StudyState) => void;
+  onDraftChange: (topicId: string, value: string) => void;
+  onClearDraft: (topicId: string) => void;
+  onConflictChange: (topicId: string, value: boolean) => void;
+  children: ReactNode;
+};
+
+function StudyItem({
+  row,
+  initial,
+  draftOverride,
+  conflict,
+  url,
+  onStateChange,
+  onDraftChange,
+  onClearDraft,
+  onConflictChange,
+  children,
+}: StudyItemProps) {
+  const state: StudyState = initial ?? {
+    topic: row.id,
+    revision: 0,
+    completed: false,
+    note: "",
+  };
+  const draft = draftOverride ?? state.note;
   const [saving, setSaving] = useState(false);
   const [message, setMessage] = useState("");
-  const [conflict, setConflict] = useState(false);
+
   async function save(fields: Fields) {
     setSaving(true);
     setMessage("");
+    const currentDraft = draft;
     try {
-      const response = await fetch(url + "/" + row.id, { method: "PUT",
-        headers: {"Content-Type": "application/json", "X-Review-Request": "1"},
-        body: JSON.stringify({ revision: state.revision, ...fields }) });
+      const response = await fetch(url + "/" + row.id, {
+        method: "PUT",
+        headers: {
+          "Content-Type": "application/json",
+          "X-Review-Request": "1",
+        },
+        body: JSON.stringify({ revision: state.revision, ...fields }),
+      });
       if (response.status === 409) {
-        const latest: State = await response.json();
-        setState(latest);
-        setConflict(true);
-        setMessage("其他页面已更新此项，请核对已保存的笔记后再保存。");
+        const latest = (await response.json()) as StudyState;
+        onDraftChange(row.id, currentDraft);
+        onStateChange(latest);
+        onConflictChange(row.id, true);
         return;
       }
-      if (!response.ok) throw Error();
-      const latest: State = await response.json();
-      setState(latest);
-      if (fields.note !== undefined) setConflict(false);
+      if (!response.ok) throw new Error();
+      const latest = (await response.json()) as StudyState;
+      onStateChange(latest);
+      if (fields.note !== undefined) {
+        onClearDraft(row.id);
+        onConflictChange(row.id, false);
+      }
       setMessage("已保存");
     } catch {
       setMessage("保存失败，输入已保留，请重试。");
-    } finally { setSaving(false); }
+    } finally {
+      setSaving(false);
+    }
   }
-  return <article className="study-item">
-    {children}
-    <p>{row.topic.chapter}</p>
-    <label><input type="checkbox" checked={state.completed} disabled={saving}
-      onChange={e => void save({completed: e.target.checked})}/> 已完成 · {row.topic.name}</label>
-    <div className="study-note">
-      <label htmlFor={"note-" + row.id}>学习笔记 · {row.topic.name}</label>
-      <textarea id={"note-" + row.id} rows={3} value={draft} onChange={e => setDraft(e.target.value)}/>
-    </div>
-    {conflict && <p>已保存的笔记：{state.note || "（空）"}</p>}
-    <button disabled={saving || (draft === state.note && !conflict)} onClick={() => void save({note: draft})}>保存笔记</button>
-    <span role="status"> {message}</span>
-  </article>;
+
+  function handleApplySaved() {
+    onClearDraft(row.id);
+    onConflictChange(row.id, false);
+    setMessage("已填入已保存内容");
+  }
+
+  return (
+    <article className="study-item">
+      {children}
+
+      <div className="study-controls-bar">
+        <label className="study-check-label">
+          <input
+            type="checkbox"
+            checked={state.completed}
+            disabled={saving}
+            onChange={(e) => void save({ completed: e.target.checked })}
+          />
+          <span>已完成 · {row.topic.name}</span>
+        </label>
+        <span className="study-chapter-tag">{row.topic.chapter}</span>
+      </div>
+
+      <div className="study-note">
+        <label htmlFor={"note-" + row.id}>学习笔记 · {row.topic.name}</label>
+        <textarea
+          id={"note-" + row.id}
+          rows={3}
+          value={draft}
+          onChange={(e) => onDraftChange(row.id, e.target.value)}
+        />
+      </div>
+
+      {conflict && (
+        <div
+          className="conflict-box"
+          role="region"
+          aria-label={`笔记冲突核对 · ${row.topic.name}`}
+        >
+          <div className="conflict-head">
+            <p className="conflict-title" role="status">
+              其他页面已更新此项，请核对已保存的笔记后再保存。
+            </p>
+            <button
+              type="button"
+              className="sub conflict-apply-btn"
+              disabled={saving}
+              onClick={handleApplySaved}
+            >
+              填入已保存内容
+            </button>
+          </div>
+          <div className="conflict-columns">
+            <div className="conflict-col">
+              <div className="conflict-col-label">已保存内容</div>
+              <pre className="conflict-text">{state.note || "（空）"}</pre>
+            </div>
+            <div className="conflict-col">
+              <div className="conflict-col-label">当前草稿</div>
+              <pre className="conflict-text">{draft || "（空）"}</pre>
+            </div>
+          </div>
+        </div>
+      )}
+
+      <div className="study-actions">
+        <button
+          type="button"
+          disabled={saving || (draft === state.note && !conflict)}
+          onClick={() => void save({ note: draft })}
+        >
+          保存笔记
+        </button>
+        {message && (
+          <span
+            className={
+              message.startsWith("保存失败")
+                ? "study-status is-error"
+                : "study-status"
+            }
+            role="status"
+          >
+            {message}
+          </span>
+        )}
+      </div>
+    </article>
+  );
 }
 
-export function Study({rows, version, detail}: {rows: Topic[]; version: string; detail: (r: Topic) => ReactNode}) {
-  const [states, setStates] = useState<Map<string,State> | null>(null);
-  const [failed, setFailed] = useState(false);
-  const [attempt, setAttempt] = useState(0);
+export type StudyProps = {
+  rows: Topic[];
+  version: string;
+  states: Map<string, StudyState> | null;
+  failed: boolean;
+  onRetry: () => void;
+  onStateChange: (next: StudyState) => void;
+  drafts: Record<string, string>;
+  onDraftChange: (topicId: string, value: string) => void;
+  onClearDraft: (topicId: string) => void;
+  conflicts: Record<string, boolean>;
+  onConflictChange: (topicId: string, value: boolean) => void;
+  detail: (row: Topic) => ReactNode;
+};
+
+export function Study({
+  rows,
+  version,
+  states,
+  failed,
+  onRetry,
+  onStateChange,
+  drafts,
+  onDraftChange,
+  onClearDraft,
+  conflicts,
+  onConflictChange,
+  detail,
+}: StudyProps) {
   const url = "/api/course/versions/" + version + "/states";
-  useEffect(() => {
-    let active = true;
-    setFailed(false);
-    fetch(url).then(async response => {
-      if (!response.ok) throw Error();
-      const data: State[] = await response.json();
-      if (active) setStates(new Map(data.map(s => [s.topic,s])));
-    }).catch(() => { if (active) setFailed(true); });
-    return () => {active = false;};
-  }, [url,attempt]);
-  if (failed) return <p role="alert">读取学习记录失败。 <button onClick={() => setAttempt(n => n+1)}>重试</button></p>;
-  if (!states) return <p>正在读取学习记录…</p>;
-  return <>{rows.map(row => <StudyItem key={row.id} row={row} initial={states.get(row.id)} url={url}>{detail(row)}</StudyItem>)}</>;
+
+  if (failed) {
+    return (
+      <p className="alert-inline" role="alert">
+        读取学习记录失败。{" "}
+        <button type="button" className="sub" onClick={onRetry}>
+          重试
+        </button>
+      </p>
+    );
+  }
+
+  if (!states) {
+    return <p className="hint">正在读取学习记录…</p>;
+  }
+
+  return (
+    <div className="study-list">
+      {rows.map((row) => (
+        <StudyItem
+          key={row.id}
+          row={row}
+          initial={states.get(row.id)}
+          draftOverride={drafts[row.id]}
+          conflict={Boolean(conflicts[row.id])}
+          url={url}
+          onStateChange={onStateChange}
+          onDraftChange={onDraftChange}
+          onClearDraft={onClearDraft}
+          onConflictChange={onConflictChange}
+        >
+          {detail(row)}
+        </StudyItem>
+      ))}
+    </div>
+  );
 }
