@@ -124,6 +124,29 @@ export type ActiveEvidence = {
   review: boolean;
 };
 
+export type VideoStatus =
+  | "queued"
+  | "running"
+  | "ready"
+  | "partial"
+  | "failed";
+
+export type VideoItem = {
+  url: string;
+  title: string;
+  target: string;
+  topics: string[];
+  views: number | null;
+  likes: number | null;
+  favorites: number | null;
+};
+
+export type VideoState = {
+  status: VideoStatus | string;
+  reason: string;
+  items: VideoItem[];
+};
+
 export function formatBatchLabel(jobs: string[], jobId: string): string {
   const index = jobs.indexOf(jobId);
   if (index >= 0) return `第 ${jobs.length - index} 批`;

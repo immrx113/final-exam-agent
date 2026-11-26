@@ -32,6 +32,12 @@
 - **解决方案**：将学习记录 `states`、草稿 `drafts` 与冲突标记上提至 `Analysis.tsx` 按 `version` 维护，同时对非激活 `tabpanel` 和未展开的计划步骤详情采用条件渲染（收起时不挂载内联 `.topic` 节点），冲突提示统一由 `.conflict-title[role="status"]` 单点承载。
 - **验证结果**：运行 `m2-tests/visibility.mjs` 及无头 Edge 验证脚本，确认计划步骤默认态下 `plan.first().locator("a")` 唯一匹配前置链接、展开态下支持页内对照与 `Esc` 归还焦点、跨页签切换不丢草稿与冲突核对状态。
 
+## 2026-11-26 · 独立参考视频区严格契约与固定视频源队列隔离
+
+- **背景与问题**：在 Task 4（`videos-a11y-regression`）升级独立参考视频区、窄屏防溢出与执行全量回归时遇到两处关键约束：（1）`m4-tests/course.mjs` 通过 `video.getByRole("link").count()` 断言推荐条数，并用严格模式 `video.getByText(/HTTP 412/)` 等等待状态，若在区域内增加额外说明链接或在状态栏重复渲染 `reason` 会破坏断言；同时 60 字无空格中文文件名在 `390×844` 窄屏 flex 行内若缺少 `min-width: 0; max-width: 100%` 易撑宽容器；（2）在同一试用 MySQL（`33315`）同时运行常规试用实例（`18085`）与固定模拟视频源实例（`18087`，`--review.video-api=http://127.0.0.1:18442`）时，`18085` 的 `@Scheduled` 轮询会先认领 `video_job` 记录并请求真实接口，导致 `18087` 页面未收到模拟的 HTTP 412。
+- **解决方案**：`Videos.tsx` 升级为 `<h2>` 标题与版本胶囊，区域内仅推荐卡片渲染 `<a>`，状态与目录后备提示统一收敛在单条 `role="status"` / `role="alert"` 横幅内，按 `target === "合集单集"` 区分 `单集数据` 与 `整条视频`；`.file-name` 补充 `min-width: 0; max-width: 100%; word-break: break-word`；运行 `m4-tests/course.mjs` 固定模拟源前先停止共享同一测试库的其他后端实例，保证 `video_job` 仅由指向 `18442` 的实例消费。
+- **验证结果**：在无头 Edge 与独立试用环境中运行 `m5-tests/ui-refactor.mjs`（UI-01～UI-05）及 M2～M5 全套回归测试全部通过，`1280×800` 与 `390×844` 双视口零横向溢出。
+
 ## 条目模板
 
 - **日期与模块**：问题发生在哪个阶段、哪个功能或模块？

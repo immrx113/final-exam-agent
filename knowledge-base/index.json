@@ -30,17 +30,20 @@
       "path": "knowledge-base/frontend-refactor-plan.md",
       "title": "个人期末复习助手 · 前端重构开发规划",
       "status": "active",
-      "status_reason": "用户已确认前端重构方案并分步推进开发，Task 1、Task 2 与 Task 3 已完成实施与实测核验，Task 4 待实施后完成全量写库回归。",
+      "status_reason": "用户已确认前端重构方案并分四步推进开发，Task 1～Task 4 已全部完成实施、重构专项自动化验证及 M2～M5 全量回归核验。",
       "verification_state": "verified",
       "verified_on": "2026-11-26",
-      "verification_scope": "重构总体设计决策，Task 1（dual-track-workspace：双轨状态解耦、自适应导入台、批次与版本铭牌、同级视频区挂载）、Task 2（evidence-drawer：课件/资料徽章与真题分组卡片、页内原文对照面板、行号高亮、原图三档缩放、Esc 关闭焦点归还、刚查看锚点与三类空状态引导）及 Task 3（tabs-plan-study：四页签导航与进度徽章、方向键切换、参考计划原地展开考点与去待办记笔记聚焦跳转、409 冲突双栏核对框与填入已保存内容、5 个测试脚本页签定位器同步）的设计与浏览器实测结果。Task 4 的实现及写库全量回归待后续核验。",
+      "verification_scope": "重构总体设计决策与“霁蓝考卷·康奈尔笔记”视觉令牌体系，Task 1（dual-track-workspace：双轨状态解耦、自适应导入台、批次与版本铭牌、同级视频区挂载）、Task 2（evidence-drawer：课件/资料徽章与真题分组卡片、页内原文对照面板、行号高亮、原图三档缩放、Esc 关闭焦点归还、刚查看锚点与三类空状态引导）、Task 3（tabs-plan-study：四页签导航与进度徽章、方向键切换、参考计划原地展开考点与去待办记笔记聚焦跳转、409 冲突双栏核对框与填入已保存内容、5 个测试脚本页签定位器同步）及 Task 4（videos-a11y-regression：独立参考视频区 h2 与版本胶囊、目录后备/异常状态栏与重试入口、合集单集“单集数据”与其余“整条视频”指标层级区分、全局焦点环与双视口长文件名防溢出、m5-tests/ui-refactor.mjs UI-01～UI-05 专项验证与 M2～M5 独立试用环境全量写库回归）的设计与实测结果。",
       "verification_evidence": [
         "2026-11-26 用户审阅 Task 1 的范围、实施步骤与完成标准后回复“开始开发”。",
         "2026-11-26 执行 npm.cmd run build --prefix web、本地 Maven 打包、m2-tests/visibility.mjs 回归，以及 Edge 无头验证首次引导、快捷导入条、跨批次切换与 504 超时状态隔离、精确标签匹配和 390px 窄屏防溢出均通过。",
         "2026-11-26 用户审阅 Task 2 的范围、实施方案与完成标准后回复“进行开发”。",
         "2026-11-26 完成 Task 2（evidence-drawer）实施，执行 npm.cmd run build --prefix web、本地 Maven 打包、m2-tests/visibility.mjs 回归，并在无头 Edge 中验证课件/资料出处徽章与 .topic li 严格计数、lines.html#L4 目标行高亮与原件下载、跨视角切换后 Esc 关闭焦点归还与刚查看标记、预览 503 失败重试与三档图片缩放、三类空状态引导及 1280×800 / 390×844 超长中文文件名防溢出均通过。",
         "2026-11-26 用户审阅 Task 3 的范围、实施方案与完成标准后回复“开始开发”。",
-        "2026-11-26 完成 Task 3（tabs-plan-study）实施与 5 个测试脚本定位器同步，执行 npm.cmd run build --prefix web、本地 Maven 打包、迁移后的 m2-tests/visibility.mjs 回归，并在无头 Edge 中验证四页签计数/进度徽章与 ArrowRight/ArrowLeft/Home/End 键盘导航、参考计划严格单链接兼容与原地展开页内对照、去待办记笔记自动聚焦 textarea#note-{id}、跨页签与跨批次草稿保持、保存断线与读取失败重试、409 冲突双栏对照与填入已保存内容，以及 1280×800 / 390×844 视口防横向溢出均通过。"
+        "2026-11-26 完成 Task 3（tabs-plan-study）实施与 5 个测试脚本定位器同步，执行 npm.cmd run build --prefix web、本地 Maven 打包、迁移后的 m2-tests/visibility.mjs 回归，并在无头 Edge 中验证四页签计数/进度徽章与 ArrowRight/ArrowLeft/Home/End 键盘导航、参考计划严格单链接兼容与原地展开页内对照、去待办记笔记自动聚焦 textarea#note-{id}、跨页签与跨批次草稿保持、保存断线与读取失败重试、409 冲突双栏对照与填入已保存内容，以及 1280×800 / 390×844 视口防横向溢出均通过。",
+        "2026-11-26 用户审阅 Task 4 的范围、实施方案与完成标准后回复“开启task4阶段开发”。",
+        "2026-11-26 完成 Task 4（videos-a11y-regression）实施并新增 m5-tests/ui-refactor.mjs，执行前后端构建、StudyRulesTest、VideoRulesTest、Python Agent 8 项单元用例（含语义模式）、m5-tests/holdout.py，并在 final-review-m5 独立试用环境通过 visibility.mjs、ui-refactor.mjs（UI-01～UI-05）、m2-tests/browser.mjs、m2-tests/edges.mjs（含 502/504 故障注入）、m3-tests/course.mjs、m3-tests/restart.mjs、m4-tests/course.mjs（18442 固定模拟源及 --live --current 真实检索）及 m5-tests/course.mjs、recovery.mjs 全量回归。",
+        "2026-11-26 用户审阅 4 套备选配色与示例图后回复“选择方案A”（霁蓝考卷·康奈尔笔记），完成 style.css 色彩令牌升级、前后端重新构建及本机页面刷新验证。"
       ]
     },
     {
@@ -67,7 +70,7 @@
       "path": "knowledge-base/development-notes.md",
       "title": "开发问题与性能优化记录",
       "status": "draft",
-      "status_reason": "已记录 M3 笔记定位、M4 公开搜索受限、M5 扫描卷归属、前端重构文件选择标签精确匹配及四页签与参考计划严格定位器隔离问题，待作为开发依据前核验。",
+      "status_reason": "已记录 M3 笔记定位、M4 公开搜索受限、M5 扫描卷归属、前端重构文件选择标签精确匹配、四页签与参考计划严格定位器隔离，以及独立参考视频区严格契约与固定视频源队列隔离问题，待作为开发依据前核验。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,

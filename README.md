@@ -23,23 +23,24 @@ $env:REVIEW_SEMANTIC = '0'
 
 ```powershell
 ./m5-tests/samples.ps1
-node m5-tests/course.mjs
 $env:REVIEW_TEST_URL = 'http://127.0.0.1:18085'
+node m5-tests/ui-refactor.mjs
+node m5-tests/course.mjs
 node m4-tests/course.mjs --live --current
 node m5-tests/recovery.mjs
 $env:REVIEW_SEMANTIC = '0'
 python m5-tests/holdout.py
 ```
 
-生成的课件、讲义、三份样卷和一张散页在 `.local/m5-samples`。人工答案和逐题断言在 [M5 课程用例](m5-tests/course.mjs)，机器配置、耗时、质量基线及视频服务限制见 [M5 逐项验收记录](knowledge-base/m5-acceptance.md)。
+其中 `m5-tests/ui-refactor.mjs` 通过路由拦截验证双轨批次工作区、页内原文对照、四页签键盘切换、409 冲突核对、视频统计层级与宽窄屏防溢出，不向课程库写入数据。生成的课件、讲义、三份样卷和一张散页在 `.local/m5-samples`。人工答案和逐题断言在 [M5 课程用例](m5-tests/course.mjs)，机器配置、耗时、质量基线及视频服务限制见 [M5 逐项验收记录](knowledge-base/m5-acceptance.md)。
 
 ## M4 课程参考视频
 
-运行 `./m1.ps1`，发布一次课程分析后，复习页底部的“B 站参考视频”会独立加载。系统使用课程名和参考计划中最多三个优先知识点查询公开接口，同一查询最多取三个候选做详情匹配。整门课合计最多展示三条。可定位到分 P 或合集单集时直接打开对应的一讲。播放、点赞和收藏按整条目标视频标注，共同可用的指标依次参与排序。
+运行 `./m1.ps1`，发布一次课程分析后，复习页底部同级独立的“B 站参考视频”区域会自动按版本检索并标明归属批次与版本号。系统使用课程名和参考计划中最多三个优先知识点查询公开接口，同一查询最多取三个候选做详情匹配。整门课合计最多展示三条。可定位到分 P 或合集单集时直接打开对应的一讲。合集单集按`单集数据`展示指标，分 P、整套课程与独立视频按`整条视频`标注播放、点赞和收藏，共同可用的指标依次参与排序。
 
-公开搜索在本机验收时返回 HTTP 412。没有可用搜索候选时，系统会读取[课程 BV 目录](server/src/main/resources/video-catalog.json)，匹配实际标题或讲次，并在视频区标明来源。维护者可在课程名对应的数组中增补公开课程的 BV 号，重新构建服务后对失败或部分成功的查询点“重试视频检索”，或发布新分析。刷新会读取该版本已保存的结果。目录和搜索均不可用时，页面显示失败原因，其他复习操作仍可使用。
+没有可用公开搜索候选时，系统会读取[课程 BV 目录](server/src/main/resources/video-catalog.json)，匹配实际标题或讲次，并在视频区状态栏标明“目录后备”来源。维护者可在课程名对应的数组中增补公开课程的 BV 号，重新构建服务后对失败或部分成功的查询点“重试视频检索”，或发布新分析。刷新会读取该版本已保存的结果。目录和搜索均不可用时，页面显示失败原因，其他复习操作仍可使用。
 
-用专用测试服务验证公开来源时，设置 `REVIEW_TEST_URL` 后运行 `node m4-tests/course.mjs --live`。该用例会上传自制资料、发布分析，并在 Edge 打开推荐。验证固定样例时，为专用后端追加 `--review.video-api=http://127.0.0.1:18442`，运行 `node m4-tests/course.mjs`；测试脚本在此端口模拟搜索拒绝、详情不可读、缺失指标和迟到结果。规则测试可在完成 Maven 构建后运行：
+用专用测试服务验证公开来源时，设置 `REVIEW_TEST_URL` 后运行 `node m4-tests/course.mjs --live`。该用例会上传自制资料、发布分析，并在 Edge 打开推荐。验证固定样例时，确保同一测试库没有其他开启视频轮询的后端实例，为专用后端追加 `--review.video-api=http://127.0.0.1:18442`，运行 `node m4-tests/course.mjs`；测试脚本在此端口模拟搜索拒绝、详情不可读、缺失指标和迟到结果。规则测试可在完成 Maven 构建后运行：
 
 ```powershell
 javac -encoding UTF-8 -cp server/target/classes -d server/target/test-classes m4-tests/VideoRulesTest.java

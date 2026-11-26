@@ -322,6 +322,7 @@ function App() {
         <Videos
           key={publishedSnapshot.version}
           version={publishedSnapshot.version}
+          batchLabel={publishedBatchLabel}
         />
       )}
     </main>
