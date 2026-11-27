@@ -12,19 +12,22 @@ import org.springframework.web.server.ResponseStatusException;
 import static local.review.AnalysisApi.*;
 
 @RestController
-@RequestMapping("/api/course/versions/{version}")
+@RequestMapping({"/api/course", "/api/courses/{course}"})
 class StudyApi {
+  private final CourseMapper courses;
   private final AnalysisMapper analysis;
   private final StudyMapper states;
   private final ObjectMapper json;
 
-  StudyApi(AnalysisMapper analysis, StudyMapper states, ObjectMapper json) {
+  StudyApi(CourseMapper courses, AnalysisMapper analysis, StudyMapper states, ObjectMapper json) {
+    this.courses = courses;
     this.analysis = analysis;
     this.states = states;
     this.json = json;
   }
 
-  private Result snapshot(UUID version) throws JsonProcessingException {
+  private Result snapshot(String owner, UUID version) throws JsonProcessingException {
+    if (!analysis.ownsVersion(owner, version.toString())) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     String raw = analysis.result(version.toString());
     if (raw == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     return json.readValue(raw, Result.class);
@@ -32,42 +35,45 @@ class StudyApi {
 
   record Change(Long revision, Boolean completed, String note) {}
 
-  @GetMapping("/states")
-  List<StudyMapper.State> states(@PathVariable UUID version) throws JsonProcessingException {
+  @GetMapping("/versions/{version}/states")
+  List<StudyMapper.State> states(@PathVariable(name="course", required=false) String course, @PathVariable UUID version) throws JsonProcessingException {
     var visible = new HashSet<String>();
-    var result = snapshot(version);
+    String owner = courses.require(course).id();
+    var result = snapshot(owner, version);
     for (var row : result.ranked()) if (result.paperCount()==0 || row.count()>0) visible.add(row.id());
-    return states.all().stream().filter(s -> visible.contains(s.topic())).toList();
+    return states.all(owner).stream().filter(s -> visible.contains(s.topic())).toList();
   }
 
-  @PutMapping(value="/states/{topic}", headers="X-Review-Request=1")
+  @PutMapping(value="/versions/{version}/states/{topic}", headers="X-Review-Request=1")
   @Transactional
-  ResponseEntity<StudyMapper.State> save(@PathVariable UUID version, @PathVariable UUID topic,
+  ResponseEntity<StudyMapper.State> save(@PathVariable(name="course", required=false) String course, @PathVariable UUID version, @PathVariable UUID topic,
       @RequestBody Change change) throws JsonProcessingException {
     String id = topic.toString();
-    if (change.revision()==null || change.revision()<0 || (change.completed()==null && change.note()==null))
-      throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-    var result = snapshot(version);
+    String owner = courses.require(course).id();
+    var result = snapshot(owner, version);
     if (result.ranked().stream().noneMatch(r -> r.id().equals(id) && (r.count()>0 || result.paperCount()==0)))
       throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    if (change.revision()==null || change.revision()<0 || (change.completed()==null && change.note()==null))
+      throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
     if (change.revision()==0) {
-      try { states.create(id,change.completed(),change.note()); }
-      catch (DuplicateKeyException e) { return conflict(id); }
-    } else if (states.update(id,change.revision(),change.completed(),change.note())==0) {
-      return conflict(id);
+      try { states.create(owner,id,change.completed(),change.note()); }
+      catch (DuplicateKeyException e) { return conflict(owner,id); }
+    } else if (states.update(owner,id,change.revision(),change.completed(),change.note())==0) {
+      return conflict(owner,id);
     }
-    return ResponseEntity.ok(states.get(id));
+    return ResponseEntity.ok(states.get(owner,id));
   }
 
-  private ResponseEntity<StudyMapper.State> conflict(String id) {
-    return ResponseEntity.status(HttpStatus.CONFLICT).body(states.current(id));
+  private ResponseEntity<StudyMapper.State> conflict(String owner, String id) {
+    return ResponseEntity.status(HttpStatus.CONFLICT).body(states.current(owner,id));
   }
 
-  @GetMapping("/export")
-  ResponseEntity<byte[]> export(@PathVariable UUID version) throws JsonProcessingException {
-    var document = markdown(snapshot(version));
+  @GetMapping("/versions/{version}/export")
+  ResponseEntity<byte[]> export(@PathVariable(name="course", required=false) String course, @PathVariable UUID version) throws JsonProcessingException {
+    var owner = courses.require(course);
+    var document = markdown(owner.name(), snapshot(owner.id(), version));
     if (document.isEmpty()) return ResponseEntity.noContent().build();
-    var filename = ContentDisposition.attachment().filename("数据库原理-" + version + ".md", StandardCharsets.UTF_8).build();
+    var filename = ContentDisposition.attachment().filename(owner.name().replaceAll("[<>:\"|?*]", "_") + "-" + version + ".md", StandardCharsets.UTF_8).build();
     return ResponseEntity.ok().contentType(MediaType.parseMediaType("text/markdown;charset=UTF-8"))
         .header(HttpHeaders.CONTENT_DISPOSITION, filename.toString()).body(document.getBytes(StandardCharsets.UTF_8));
   }
@@ -77,12 +83,12 @@ class StudyApi {
         .replace(">","&gt;").replaceAll("([\\\\\u0060*_{}\\[\\]()#!|~])", "\\\\$1");
   }
 
-  static String markdown(Result result) {
+  static String markdown(String courseName, Result result) {
     Map<String,List<Ranked>> chapters = new LinkedHashMap<>();
     result.ranked().stream().filter(r -> r.count()>0).sorted(Comparator.comparingInt(Ranked::outlineOrder))
         .forEach(r -> chapters.computeIfAbsent(r.topic().chapter(), k -> new ArrayList<>()).add(r));
     if (chapters.isEmpty()) return "";
-    var out = new StringBuilder("# 数据库原理\n\n格式版本：1\n\n分析版本：").append(result.version())
+    var out = new StringBuilder("# ").append(plain(courseName)).append("\n\n格式版本：1\n\n分析版本：").append(result.version())
         .append("\n\n有效试卷：").append(result.paperCount()).append(" 份\n");
     chapters.forEach((chapter,rows) -> {
       out.append("\n## ").append(plain(chapter)).append("\n");

@@ -14,7 +14,6 @@ import org.springframework.web.util.HtmlUtils;
 
 @Component
 class VideoSource {
-  private static final String COURSE = "数据库原理";
   private static final String API = "https://api.bilibili.com";
   private final ObjectMapper json;
   private final String base;
@@ -85,7 +84,7 @@ class VideoSource {
   record Candidate(String name, Set<String> queries) {}
 
   static List<VideoRules.Item> resolve(
-      String id, Candidate candidate, JsonNode detail, List<String> topics) {
+      String courseName, String id, Candidate candidate, JsonNode detail, List<String> topics) {
     String name = title(detail);
     if (name.isBlank()) name = candidate.name();
     var items = new ArrayList<VideoRules.Item>();
@@ -109,7 +108,7 @@ class VideoSource {
       }
     if (!items.isEmpty()) return items;
     var points = matches(name, topics);
-    boolean courseTitle = name.contains(COURSE) || name.contains("数据库系统概论");
+    boolean courseTitle = name.contains(courseName) || (courseName.equals("数据库原理") && name.contains("数据库系统概论"));
     if (points.isEmpty() && courseTitle && pages.size() == 0)
       points = List.copyOf(candidate.queries());
     if (!points.isEmpty())
@@ -124,12 +123,12 @@ class VideoSource {
     return items;
   }
 
-  VideoApi.State lookup(List<String> topics) throws InterruptedException {
+  VideoApi.State lookup(String courseName, List<String> topics) throws InterruptedException {
     if (topics.isEmpty()) return new VideoApi.State("ready", "暂无可推荐的知识点", List.of());
     var candidates = new LinkedHashMap<String, Candidate>();
     var notices = new LinkedHashSet<String>();
     for (String topic : topics.stream().limit(3).toList()) {
-      String q = URLEncoder.encode(COURSE + " " + topic, StandardCharsets.UTF_8);
+      String q = URLEncoder.encode(courseName + " " + topic, StandardCharsets.UTF_8);
       try {
         var data = get("/x/web-interface/search/type?search_type=video&keyword=" + q);
         if (!data.path("result").isArray() && data.path("numResults").asInt(-1) != 0)
@@ -152,14 +151,14 @@ class VideoSource {
     var items = new ArrayList<VideoRules.Item>();
     for (var entry : candidates.entrySet()) {
       JsonNode detail = details(entry.getKey(), notices);
-      items.addAll(resolve(entry.getKey(), entry.getValue(), detail, topics));
+      items.addAll(resolve(courseName, entry.getKey(), entry.getValue(), detail, topics));
     }
     boolean usedCatalog = false;
     if (items.isEmpty()) {
-      for (var entry : catalog.path(COURSE)) {
+      for (var entry : catalog.path(courseName)) {
         String id = entry.asText();
         if (!validId(id) || candidates.containsKey(id)) continue;
-        items.addAll(resolve(id, new Candidate("", Set.of()), details(id, notices), topics));
+        items.addAll(resolve(courseName, id, new Candidate("", Set.of()), details(id, notices), topics));
       }
       usedCatalog = !items.isEmpty();
     }
@@ -168,6 +167,7 @@ class VideoSource {
     if (items.isEmpty() && !failed) notices.add("暂无匹配视频");
     var report = VideoRules.rank(items, topics, String.join(" ", notices));
     String status = failed ? (items.isEmpty() ? "failed" : "partial") : "ready";
+    if (!failed && items.isEmpty() && catalog.path(courseName).size() == 0) status = "retry_empty";
     return new VideoApi.State(status, report.reason(), report.items());
   }
 

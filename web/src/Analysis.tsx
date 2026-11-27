@@ -1,3 +1,4 @@
+import { useCourseBase } from "./api";
 import {
   useEffect,
   useLayoutEffect,
@@ -37,6 +38,7 @@ export function Analysis({
   publishedBatchLabel,
   onSelectPublishedJob,
 }: AnalysisProps) {
+  const base = useCourseBase();
   const [view, setView] = useState<ViewMode>("rank");
   const [expandedTopics, setExpandedTopics] = useState<Set<string>>(
     () => new Set(),
@@ -91,7 +93,7 @@ export function Analysis({
     if (!version) return;
     let active = true;
     setStudyFailed(false);
-    fetch(`/api/course/versions/${version}/states`)
+    fetch(`${base}/versions/${version}/states`)
       .then(async (response) => {
         if (!response.ok) throw new Error();
         const data = (await response.json()) as StudyState[];
@@ -458,7 +460,7 @@ export function Analysis({
           <div className="export-bar">
             <a
               className="export-link"
-              href={`/api/course/versions/${snapshot.version}/export`}
+              href={`${base}/versions/${snapshot.version}/export`}
               download
             >
               下载 Markdown 复习文档

@@ -18,7 +18,7 @@ interface VideoMapper {
 
   @Update(
       "UPDATE analysis_versions SET video_status='queued',video_result=NULL WHERE"
-          + " version_id=#{version} AND video_status IN ('failed','partial')")
+          + " version_id=#{version} AND (video_status IN ('failed','partial','retry_empty'))")
   int retry(String version);
 
   String AVAILABLE =
@@ -26,8 +26,10 @@ interface VideoMapper {
           + " INTERVAL 5 MINUTE))";
 
   @Select(
-      "SELECT version_id FROM analysis_versions WHERE " + AVAILABLE + " ORDER BY seq DESC LIMIT 1")
-  String next();
+      "SELECT v.version_id AS versionId,c.name AS courseName FROM analysis_versions v JOIN courses c ON c.id=v.course_id WHERE " + AVAILABLE + " ORDER BY v.seq DESC LIMIT 1")
+  Pending next();
+
+  record Pending(String versionId, String courseName) {}
 
   @Update(
       "UPDATE analysis_versions SET video_status='running', video_started=UTC_TIMESTAMP(),"

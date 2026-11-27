@@ -13,15 +13,17 @@ import org.springframework.web.multipart.MultipartFile;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/course")
+@RequestMapping({"/api/course", "/api/courses/{course}"})
 class ImportApi {
+  private final CourseMapper courses;
   static final Set<String> FORMATS =
       Set.of("pdf", "ppt", "pptx", "doc", "docx", "md", "png", "jpg", "jpeg");
   static final Set<String> ROLES = Set.of("courseware", "material", "exam");
   final Catalog db;
   final Store store;
 
-  ImportApi(Catalog db, Store store) {
+  ImportApi(CourseMapper courses, Catalog db, Store store) {
+    this.courses = courses;
     this.db = db;
     this.store = store;
   }
@@ -39,8 +41,9 @@ class ImportApi {
   }
 
   @PostMapping(value = "/files", headers = "X-Review-Request=1")
-  Map<String, String> upload(@RequestParam MultipartFile file, @RequestParam String role)
+  Map<String, String> upload(@PathVariable(name="course", required=false) String course, @RequestParam MultipartFile file, @RequestParam String role)
       throws Exception {
+    var owner = courses.require(course);
     String name = Objects.toString(file.getOriginalFilename(), "");
     if (name.isBlank()
         || name.length() > 255
@@ -59,9 +62,9 @@ class ImportApi {
       }
       String digest = hex(hash.digest());
       String id =
-          hex(hash.digest((role + "\0" + name + "\0" + digest).getBytes(StandardCharsets.UTF_8)));
+          hex(hash.digest(((owner.id().equals("default") ? "" : owner.id() + "\0") + role + "\0" + name + "\0" + digest).getBytes(StandardCharsets.UTF_8)));
       putOriginal(digest, temp);
-      db.addFile(new Catalog.FileRow(id, name, role, digest));
+      db.addFile(new Catalog.FileRow(id, name, role, digest, owner.id()));
       return Map.of("id", id);
     } finally {
       Files.deleteIfExists(temp);
@@ -79,27 +82,29 @@ class ImportApi {
   record ListedFile(String id, String name, String role) {}
 
   @GetMapping("/files")
-  List<ListedFile> files() {
-    return db.files().stream().map(f -> new ListedFile(f.id(), f.name(), f.role())).toList();
+  List<ListedFile> files(@PathVariable(name="course", required=false) String course) {
+    return db.files(courses.require(course).id()).stream().map(f -> new ListedFile(f.id(), f.name(), f.role())).toList();
   }
 
   record Submission(List<String> files) {}
 
   @PostMapping(value = "/jobs", headers = "X-Review-Request=1")
   @Transactional
-  Map<String, String> submit(@RequestBody Submission input) {
+  Map<String, String> submit(@PathVariable(name="course", required=false) String course, @RequestBody Submission input) {
     if (input.files() == null
         || input.files().isEmpty()
         || input.files().size() != new HashSet<>(input.files()).size()) throw invalid();
     if (input.files().stream().anyMatch(id -> id == null || !id.matches("[0-9a-f]{64}")))
       throw invalid();
     String manifest = String.join(",", new TreeSet<>(input.files()));
+    String owner = courses.require(course).id();
+    for (String id : input.files()) ownedFile(owner, id);
+    if (!owner.equals("default")) manifest = owner + ":" + manifest;
     String job = UUID.nameUUIDFromBytes(manifest.getBytes(StandardCharsets.US_ASCII)).toString();
-    db.job(job);
+    db.job(job, owner);
     var existing = db.items(job);
     if (existing.isEmpty()) {
       for (String id : input.files()) {
-        if (id == null || db.file(id) == null) throw invalid();
         db.queue(job, id);
       }
     } else if (!new HashSet<>(input.files())
@@ -110,27 +115,41 @@ class ImportApi {
   }
 
   @GetMapping("/jobs")
-  List<String> jobs() {
-    return db.jobs();
+  List<String> jobs(@PathVariable(name="course", required=false) String course) {
+    return db.jobs(courses.require(course).id());
+  }
+
+  private Catalog.FileRow ownedFile(String owner, String id) {
+    var file = db.file(id);
+    if (file == null || !owner.equals(file.courseId())) throw missing();
+    return file;
+  }
+
+  CourseMapper.Course ownedJob(String course, UUID job) {
+    var owner = courses.require(course);
+    if (!db.ownsJob(owner.id(), job.toString())) throw missing();
+    return owner;
   }
 
   @GetMapping("/jobs/{job}")
-  List<Catalog.Item> items(@PathVariable UUID job) {
+  List<Catalog.Item> items(@PathVariable(name="course", required=false) String course, @PathVariable UUID job) {
+    ownedJob(course, job);
     var result = db.items(job.toString());
     if (result.isEmpty()) throw missing();
     return result;
   }
 
   @PostMapping(value = "/jobs/{job}/{file}/retry", headers = "X-Review-Request=1")
-  void retry(@PathVariable UUID job, @PathVariable String file) {
+  void retry(@PathVariable(name="course", required=false) String course, @PathVariable UUID job, @PathVariable String file) {
+    ownedFile(ownedJob(course, job).id(), file);
     if (db.retry(job.toString(), file) != 1) throw new ResponseStatusException(HttpStatus.CONFLICT);
   }
 
   record Source(String id, int pos, String body, boolean review, String label, String url) {}
 
   @PostMapping(value = "/jobs/{job}/{file}/recheck", headers = "X-Review-Request=1")
-  void recheck(@PathVariable UUID job, @PathVariable String file) {
-    var row = db.file(file);
+  void recheck(@PathVariable(name="course", required=false) String course, @PathVariable UUID job, @PathVariable String file) {
+    var row = ownedFile(ownedJob(course, job).id(), file);
     if (row == null || !Set.of("page", "rendered").contains(Parser.kind(row.name())))
       throw invalid();
     if (db.recheck(job.toString(), file) != 1)
@@ -138,8 +157,9 @@ class ImportApi {
   }
 
   @GetMapping("/jobs/{job}/{file}/segments")
-  List<Source> segments(@PathVariable UUID job, @PathVariable String file) {
-    var f = db.file(file);
+  List<Source> segments(@PathVariable(name="course", required=false) String course, @PathVariable UUID job, @PathVariable String file) {
+    var owner = ownedJob(course, job);
+    var f = ownedFile(owner.id(), file);
     if (f == null || db.preview(job.toString(), file) == null) throw missing();
     String kind = Parser.kind(f.name());
     return db.segments(job.toString(), file).stream()
@@ -152,7 +172,7 @@ class ImportApi {
                     case "rendered" -> "转换预览第 " + s.pos() + " 页";
                     default -> "原文第 " + s.pos() + " 页";
                   };
-              String url = "/api/course/jobs/" + job + "/" + file + "/preview/" + s.pos();
+              String url = owner.base() + "/jobs/" + job + "/" + file + "/preview/" + s.pos();
               if (kind.equals("line")) url += "#L" + s.pos();
               return new Source(file + "-" + s.pos(), s.pos(), s.body(), s.review(), label, url);
             })
@@ -161,14 +181,15 @@ class ImportApi {
 
   @GetMapping("/jobs/{job}/{file}/preview/{pos}")
   void preview(
+      @PathVariable(name="course", required=false) String course,
       @PathVariable UUID job,
       @PathVariable String file,
       @PathVariable int pos,
       HttpServletResponse res)
       throws Exception {
+    var row = ownedFile(ownedJob(course, job).id(), file);
     String prefix = db.preview(job.toString(), file);
     if (prefix == null || pos < 1) throw missing();
-    var row = db.file(file);
     if (Parser.kind(row.name()).equals("image")) {
       if (pos != 1) throw missing();
       String type = Parser.extension(row.name()).equals("png") ? "image/png" : "image/jpeg";
@@ -183,9 +204,8 @@ class ImportApi {
   }
 
   @GetMapping("/files/{id}/original")
-  void original(@PathVariable String id, HttpServletResponse res) throws Exception {
-    var file = db.file(id);
-    if (file == null) throw missing();
+  void original(@PathVariable(name="course", required=false) String course, @PathVariable String id, HttpServletResponse res) throws Exception {
+    var file = ownedFile(courses.require(course).id(), id);
     res.setHeader(
         "Content-Disposition",
         ContentDisposition.attachment()

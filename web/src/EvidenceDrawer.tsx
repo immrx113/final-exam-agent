@@ -1,3 +1,4 @@
+import { useCourseBase } from "./api";
 import { useEffect, useRef, useState } from "react";
 import { ExternalIcon } from "./TopicCard";
 import type { ActiveEvidence } from "./types";
@@ -43,6 +44,7 @@ export type EvidenceDrawerProps = {
 };
 
 export function EvidenceDrawer({ evidence, onClose }: EvidenceDrawerProps) {
+  const base = useCourseBase();
   const hashMatch = /#L(\d+)$/i.exec(evidence.url);
   const targetLine = hashMatch ? Number(hashMatch[1]) : null;
   const cleanUrl = evidence.url.split("#")[0];
@@ -153,7 +155,7 @@ export function EvidenceDrawer({ evidence, onClose }: EvidenceDrawerProps) {
             {evidence.fileId && (
               <a
                 className="drawer-link"
-                href={`/api/course/files/${evidence.fileId}/original`}
+                href={`${base}/files/${evidence.fileId}/original`}
                 download
               >
                 下载原件

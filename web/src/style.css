@@ -1847,3 +1847,10 @@ section[aria-label="B 站参考视频"] {
     scroll-behavior: auto !important;
   }
 }
+
+.masthead { flex-wrap: wrap; gap: .65rem; }
+.course-actions, .course-form { display: flex; flex-wrap: wrap; align-items: center; gap: .5rem; min-width: 0; max-width: 100%; }
+.course-actions select { min-width: 0; max-width: min(18rem, 62vw); }
+.course-form { padding-block: .75rem; }
+.course-form input { max-width: 60vw; }
+.course-title { overflow-wrap: anywhere; }

@@ -6,12 +6,14 @@ import { ImportWorkspace } from "./ImportWorkspace";
 import { Videos } from "./Videos";
 import {
   courseApi,
+  defaultCourse, CurrentCourse, useCourseBase, listCourses, createCourse,
   errorMessage,
   fetchPublishedAnalysis,
   runBatchAnalysis,
 } from "./api";
 import {
   formatBatchLabel,
+  type CourseSummary,
   type BatchItem,
   type DraftFile,
   type Role,
@@ -19,7 +21,14 @@ import {
   type Snapshot,
 } from "./types";
 
-function App() {
+function Workspace({ course }: { course: CourseSummary }) {
+  const base = useCourseBase();
+  const mounted = useRef(true);
+  useEffect(() => {
+    mounted.current = true;
+    return () => { mounted.current = false; };
+  }, []);
+  const batchKey = "selected-job:" + course.id;
   const [draft, setDraft] = useState<DraftFile[]>([]);
   const [saved, setSaved] = useState<SavedFile[]>([]);
   const [picked, setPicked] = useState<string[]>([]);
@@ -45,8 +54,8 @@ function App() {
       if (id !== prev) setItems([]);
       return id;
     });
-    if (id) {
-      sessionStorage.setItem("selected-job", id);
+    if (id && mounted.current) {
+      sessionStorage.setItem(batchKey, id);
     }
   }
 
@@ -56,14 +65,14 @@ function App() {
     setInitialLoading(true);
 
     const loadImport = Promise.all([
-      courseApi<SavedFile[]>("files"),
-      courseApi<string[]>("jobs"),
+      courseApi<SavedFile[]>(base, "files"),
+      courseApi<string[]>(base, "jobs"),
     ])
       .then(([fileList, jobList]) => {
         if (!live) return;
         setSaved(fileList);
         setJobs(jobList);
-        const remembered = sessionStorage.getItem("selected-job") || "";
+        const remembered = sessionStorage.getItem(batchKey) ?? (course.id === "default" ? sessionStorage.getItem("selected-job") : "") ?? "";
         const nextJob = jobList.includes(remembered)
           ? remembered
           : jobList[0] || "";
@@ -74,7 +83,7 @@ function App() {
         if (live) setImportError(errorMessage(e));
       });
 
-    const loadPublished = fetchPublishedAnalysis()
+    const loadPublished = fetchPublishedAnalysis(base)
       .then((snap) => {
         if (live && token === analysisGeneration.current) {
           setPublishedSnapshot(snap);
@@ -106,7 +115,7 @@ function App() {
 
     async function poll() {
       try {
-        const list = await courseApi<BatchItem[]>(`jobs/${selectedJob}`);
+        const list = await courseApi<BatchItem[]>(base, `jobs/${selectedJob}`);
         if (!active) return;
         setItems(list);
         setPollError("");
@@ -136,11 +145,12 @@ function App() {
 
     try {
       for (const d of draft) {
+        if (!mounted.current) return;
         const body = new FormData();
         body.append("file", d.file);
         body.append("role", d.role);
         try {
-          const { id } = await courseApi<{ id: string }>("files", {
+          const { id } = await courseApi<{ id: string }>(base, "files", {
             method: "POST",
             body,
           });
@@ -151,13 +161,14 @@ function App() {
           errors.push(`${d.file.name}：${errorMessage(e)}`);
         }
       }
+      if (!mounted.current) return;
       setDraft(failedDrafts);
       setPicked([...ids]);
       setSaved((old) =>
         Array.from(new Map([...old, ...added].map((f) => [f.id, f])).values()),
       );
       if (ids.size > 0) {
-        const { id } = await courseApi<{ id: string }>("jobs", {
+        const { id } = await courseApi<{ id: string }>(base, "jobs", {
           method: "POST",
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ files: [...ids] }),
@@ -181,7 +192,7 @@ function App() {
   ) {
     if (!selectedJob) return;
     try {
-      await courseApi(`jobs/${selectedJob}/${fileId}/${action}`, {
+      await courseApi(base, `jobs/${selectedJob}/${fileId}/${action}`, {
         method: "POST",
       });
       setPollTick((v) => v + 1);
@@ -197,7 +208,7 @@ function App() {
     setAnalyzing(true);
     setAnalysisError("");
     try {
-      const snap = await runBatchAnalysis(selectedJob);
+      const snap = await runBatchAnalysis(base, selectedJob);
       if (token === analysisGeneration.current) {
         setPublishedSnapshot(snap);
       }
@@ -217,7 +228,7 @@ function App() {
     setAnalyzing(true);
     setAnalysisError("");
     try {
-      const snap = await fetchPublishedAnalysis();
+      const snap = await fetchPublishedAnalysis(base);
       if (token === analysisGeneration.current) {
         setPublishedSnapshot(snap);
       }
@@ -243,20 +254,11 @@ function App() {
     : "";
 
   return (
-    <main>
-      <header className="masthead">
-        <div className="masthead-brand">
-          <span className="brand-title">期末复习助手</span>
-          <span className="brand-sep" aria-hidden="true">
-            ·
-          </span>
-          <span className="brand-sub">本机单课程工作台</span>
-        </div>
-        <span className="course-pill">数据库原理</span>
-      </header>
+    <>
+
 
       <h1 className={publishedSnapshot ? "course-title is-compact" : "course-title"}>
-        数据库原理
+        {course.name}
       </h1>
 
       <ImportWorkspace
@@ -325,8 +327,70 @@ function App() {
           batchLabel={publishedBatchLabel}
         />
       )}
-    </main>
+    </>
   );
+}
+
+function App() {
+  const [courses, setCourses] = useState<CourseSummary[]>([]);
+  const [id, setId] = useState(() => sessionStorage.getItem("selected-course") ?? "default");
+  const [creating, setCreating] = useState(false);
+  const [name, setName] = useState("");
+  const [error, setError] = useState("");
+  const [busy, setBusy] = useState(false);
+  const course = courses.find(c => c.id === id) ?? defaultCourse;
+
+  useEffect(() => { void listCourses().then(setCourses); }, []);
+  useEffect(() => {
+    if (courses.length) {
+      document.title = course.name + " · 个人期末复习助手";
+      sessionStorage.setItem("selected-course", course.id);
+    }
+  }, [course, courses]);
+
+  async function submit(event: React.FormEvent) {
+    event.preventDefault();
+    if (busy) return;
+    if (!name.trim()) { setError("请输入课程名称"); return; }
+    setBusy(true);
+    try {
+      const row = await createCourse(name);
+      setCourses(old => [...old, row]);
+      setId(row.id);
+      setCreating(false);
+    } catch (e) { setError(errorMessage(e)); }
+    finally { setBusy(false); }
+  }
+
+  return <main>
+      <header className="masthead">
+        <div className="masthead-brand">
+          <span className="brand-title">期末复习助手</span>
+          <span className="brand-sep" aria-hidden="true">
+            ·
+          </span>
+          <span className="brand-sub">本机多课程工作台</span>
+        </div>
+        <div className="course-actions">
+          <select aria-label="当前课程" value={course.id} disabled={!courses.length || busy}
+            onChange={e => { setId(e.target.value); setCreating(false); }}>
+            {(courses.length ? courses : [defaultCourse]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
+          </select>
+          <button type="button" className="sub" disabled={!courses.length || busy}
+            onClick={() => { setCreating(true); setError(""); setName(""); }}>新建课程</button>
+        </div>
+      </header>
+    {creating && <form className="course-form" onSubmit={submit}
+      onKeyDown={e => { if (e.key === "Escape" && !busy) setCreating(false); }}>
+      <label>新课程名称 <input autoFocus value={name} onChange={e => setName(e.target.value)} /></label>
+      <button disabled={busy}>创建课程</button>
+      <button type="button" className="sub" disabled={busy} onClick={() => setCreating(false)}>取消</button>
+      {error && <p role="alert">{error}</p>}
+    </form>}
+    {courses.length > 0 && <CurrentCourse.Provider value={course}>
+      <Workspace key={course.id} course={course} />
+    </CurrentCourse.Provider>}
+  </main>;
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

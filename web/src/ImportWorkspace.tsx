@@ -1,3 +1,4 @@
+import { useCourseBase } from "./api";
 import React, { useState } from "react";
 import { courseApi, errorMessage } from "./api";
 import {
@@ -20,6 +21,7 @@ const ROLE_HINTS: Record<Role, string> = {
 const ACCEPT_EXTENSIONS = ".ppt,.pptx,.doc,.docx,.md,.pdf,.png,.jpg,.jpeg";
 
 function EvidenceSegments({ job, item }: { job: string; item: BatchItem }) {
+  const base = useCourseBase();
   const [sources, setSources] = useState<SegmentSource[] | null>(null);
   const [error, setError] = useState("");
 
@@ -29,7 +31,7 @@ function EvidenceSegments({ job, item }: { job: string; item: BatchItem }) {
       return;
     }
     try {
-      const data = await courseApi<SegmentSource[]>(
+      const data = await courseApi<SegmentSource[]>(base,
         `jobs/${job}/${item.file}/segments`,
       );
       setSources(data);
@@ -117,6 +119,7 @@ export function ImportWorkspace({
   onAnalyze,
   onLoadLatestAnalysis,
 }: ImportWorkspaceProps) {
+  const base = useCourseBase();
   const [manualOpen, setManualOpen] = useState(false);
   const expanded = !hasPublished || draft.length > 0 || manualOpen;
 
@@ -158,7 +161,7 @@ export function ImportWorkspace({
               <span className="role-tag">{ROLES[f.role]}</span>
               <span className="file-name">{f.name}</span>
             </label>
-            <a href={`/api/course/files/${f.id}/original`}>下载原件</a>
+            <a href={`${base}/files/${f.id}/original`}>下载原件</a>
           </div>
         ))}
       </div>
@@ -446,7 +449,7 @@ export function ImportWorkspace({
                       </span>
                     </div>
                     <div className="batch-file-actions">
-                      <a href={`/api/course/files/${item.file}/original`}>
+                      <a href={`${base}/files/${item.file}/original`}>
                         下载原件
                       </a>
                       {item.status === "ready" && (

@@ -16,8 +16,9 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/course")
+@RequestMapping({"/api/course", "/api/courses/{course}"})
 class AnalysisApi {
+  private final CourseMapper courses;
   record Ref(String file, String name, String role, String label, String url, boolean review) {}
 
   record Input(String id, String role, String kind, List<ImportApi.Source> segments) {}
@@ -50,7 +51,7 @@ class AnalysisApi {
   final String python, agent;
   final long timeout;
 
-  AnalysisApi(
+  AnalysisApi(CourseMapper courses,
       Catalog catalog,
       ImportApi imports,
       AnalysisMapper db,
@@ -60,6 +61,7 @@ class AnalysisApi {
       @Value("${review.python}") String python,
       @Value("${review.agent}") String agent,
       @Value("${review.agent-timeout-seconds}") long timeout) {
+    this.courses = courses;
     this.catalog = catalog;
     this.imports = imports;
     this.db = db;
@@ -72,8 +74,8 @@ class AnalysisApi {
   }
 
   @GetMapping(value = "/analysis", produces = MediaType.APPLICATION_JSON_VALUE)
-  String latest() {
-    String version = db.latest();
+  String latest(@PathVariable(name="course", required=false) String course) {
+    String version = db.latest(courses.require(course).id());
     if (version == null) return "null";
     String key = "review:m2:" + version;
     try {
@@ -92,7 +94,8 @@ class AnalysisApi {
   }
 
   @PostMapping(value = "/jobs/{job}/analysis", headers = "X-Review-Request=1")
-  synchronized Result analyze(@PathVariable UUID job) throws Exception {
+  synchronized Result analyze(@PathVariable(name="course", required=false) String course, @PathVariable UUID job) throws Exception {
+    var owner = imports.ownedJob(course, job);
     var items = catalog.items(job.toString());
     if (items.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
     if (items.stream().noneMatch(i -> i.status().equals("ready"))
@@ -105,27 +108,27 @@ class AnalysisApi {
       if (!item.status().equals("ready")) continue;
       var file = catalog.file(item.file());
       if (file.role().equals("exam") && !papers.add(file.digest())) continue;
-      var sources = imports.segments(job, item.file());
+      var sources = imports.segments(course, job, item.file());
       for (var s : sources)
         refs.put(
             s.id(), new Ref(file.id(), file.name(), file.role(), s.label(), s.url(), s.review()));
       files.add(new Input(file.id(), file.role(), Parser.kind(file.name()), sources));
     }
     String version = UUID.randomUUID().toString();
-    Output output = runAgent(files, version);
+    Output output = runAgent(owner, files, version);
     validate(output, version, refs);
     var passages = files.stream().filter(f -> !f.role().equals("exam"))
         .flatMap(f -> f.segments().stream()).filter(s -> !s.review())
         .map(s -> new StudyPlan.Passage(s.body(), s.id())).toList();
-    return tx.execute(status -> publish(job.toString(), version, refs, output, passages));
+    return tx.execute(status -> publish(owner, job.toString(), version, refs, output, passages));
   }
 
-  private Output runAgent(List<Input> files, String batch) throws Exception {
+  private Output runAgent(CourseMapper.Course owner, List<Input> files, String batch) throws Exception {
     Path dir = Files.createTempDirectory("m2-batch-");
     Path input = dir.resolve("input.json"), output = dir.resolve("output.json");
     Process process = null;
     try {
-      json.writeValue(input.toFile(), Map.of("batch", batch, "files", files));
+      json.writeValue(input.toFile(), Map.of("batch", batch, "course", owner.name(), "profile", owner.profile(), "files", files));
       process =
           new ProcessBuilder(python, agent, input.toString(), output.toString())
               .redirectError(ProcessBuilder.Redirect.INHERIT)
@@ -198,12 +201,12 @@ class AnalysisApi {
               && refs.keySet().containsAll(r.refs()));
   }
 
-  private static String topicId(String name) {
-    return UUID.nameUUIDFromBytes(("数据库原理/" + name).getBytes(StandardCharsets.UTF_8)).toString();
+  private static String topicId(String ns, String name) {
+    return UUID.nameUUIDFromBytes((ns + "/" + name).getBytes(StandardCharsets.UTF_8)).toString();
   }
 
-  private Result publish(String job, String version, Map<String, Ref> refs, Output out, List<StudyPlan.Passage> passages) {
-    db.begin(version, job);
+  private Result publish(CourseMapper.Course owner, String job, String version, Map<String, Ref> refs, Output out, List<StudyPlan.Passage> passages) {
+    db.begin(owner.id(), version, job);
     Map<String, List<Question>> evidence = new HashMap<>();
     Set<String> papers = new HashSet<>();
     int number = 0;
@@ -211,7 +214,7 @@ class AnalysisApi {
       papers.add(q.file());
       number++;
       for (String name : q.matches()) {
-        db.hit(version, topicId(name), q.file(), number);
+        db.hit(version, topicId(owner.topicNs(), name), q.file(), number);
         evidence.computeIfAbsent(name, unused -> new ArrayList<>()).add(q);
       }
     }
@@ -221,7 +224,7 @@ class AnalysisApi {
     Map<String, Integer> chapters = new LinkedHashMap<>();
     for (Topic t : out.topics()) {
       chapters.putIfAbsent(t.chapter(), chapters.size());
-      String id = topicId(t.name());
+      String id = topicId(owner.topicNs(), t.name());
       var c = counts.getOrDefault(id, new AnalysisMapper.Counts(id, 0, 0));
       ranked.add(
           new Ranked(

@@ -5,7 +5,7 @@ import org.apache.ibatis.annotations.*;
 
 @Mapper
 interface Catalog {
-  record FileRow(String id, String name, String role, String digest) {}
+  record FileRow(String id, String name, String role, String digest, String courseId) {}
 
   record Item(String file, String name, String role, String status, String reason) {}
 
@@ -14,21 +14,24 @@ interface Catalog {
   record Task(String job, String file, String status) {}
 
   @Insert(
-      "INSERT INTO files(id,name,role,digest) VALUES(#{id},#{name},#{role},#{digest}) ON DUPLICATE"
+      "INSERT INTO files(id,name,role,digest,course_id) VALUES(#{id},#{name},#{role},#{digest},#{courseId}) ON DUPLICATE"
           + " KEY UPDATE id=files.id")
   void addFile(FileRow file);
 
-  @Select("SELECT * FROM files WHERE id=#{id}")
+  @Select("SELECT id,name,role,digest,course_id AS courseId FROM files WHERE id=#{id}")
   FileRow file(String id);
 
-  @Select("SELECT id,name,role,digest FROM files ORDER BY name,id")
-  List<FileRow> files();
+  @Select("SELECT id,name,role,digest,course_id AS courseId FROM files WHERE course_id=#{course} ORDER BY name,id")
+  List<FileRow> files(String course);
 
-  @Insert("INSERT INTO jobs(id) VALUES(#{id}) ON DUPLICATE KEY UPDATE id=jobs.id")
-  void job(String id);
+  @Insert("INSERT INTO jobs(id,course_id) VALUES(#{id},#{course}) ON DUPLICATE KEY UPDATE id=jobs.id")
+  void job(String id, String course);
 
-  @Select("SELECT id FROM jobs ORDER BY seq DESC")
-  List<String> jobs();
+  @Select("SELECT id FROM jobs WHERE course_id=#{course} ORDER BY seq DESC")
+  List<String> jobs(String course);
+
+  @Select("SELECT EXISTS(SELECT 1 FROM jobs WHERE id=#{job} AND course_id=#{course})")
+  boolean ownsJob(String course, String job);
 
   @Insert("INSERT INTO items(job,file) VALUES(#{job},#{file})")
   void queue(String job, String file);

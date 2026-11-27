@@ -1,7 +1,15 @@
 # final-exam-agent
 期末保命
 
-## M5 Windows 单课程试用
+## Windows 多课程工作台
+
+首次打开时会选中《数据库原理》。从旧版升级后，已有文件、批次、已发布分析和笔记归入这门课。点击顶栏“新建课程”，输入名称并创建，即可为另一门课导入材料。课程名称最多 80 个字符，须唯一，且不能含控制字符或路径分隔符。
+
+用“当前课程”切换课程。切换前请保存正在编辑的笔记。工作台会关闭原文抽屉、清空未提交的文件和编辑草稿，并在同一浏览器标签页分别记住每门课上次选择的批次。两门课中同名的考点各自计数，完成状态和笔记独立保存。
+
+新课程从本课标题、强调术语、定义及括号别名提取考点。例如课件写“最近最少使用置换算法（LRU）”，试卷写“LRU”即可关联。规则分析在本机运行，可以沿用 M0 的本地 BGE 模型辅助匹配。Markdown 下载只收录本版本的正命中考点，正文显示课名，附件名中的 Windows 非法字符替换为下划线。参考视频使用当前课名和优先考点检索。已有考点但搜索无匹配、也没有本课候选目录时，可以手动重试。
+
+### 启动与独立试用
 
 安装 PowerShell 7.4+、JDK 21、Maven 3.9、Node.js 22.12+、Python 3.10+、LibreOffice 和 Windows 简体中文 OCR 语言包。启动 Docker Desktop 并切换到 Linux 容器。将 `java`、`mvn`、`npm.cmd`、`python`、`docker` 放在 PATH 中。默认安装位置和 PATH 中的 LibreOffice 均可自动找到，其他位置用 `-Office` 指定。
 
@@ -33,6 +41,18 @@ python m5-tests/holdout.py
 ```
 
 其中 `m5-tests/ui-refactor.mjs` 通过路由拦截验证双轨批次工作区、页内原文对照、四页签键盘切换、409 冲突核对、视频统计层级与宽窄屏防溢出，不向课程库写入数据。生成的课件、讲义、三份样卷和一张散页在 `.local/m5-samples`。人工答案和逐题断言在 [M5 课程用例](m5-tests/course.mjs)，机器配置、耗时、质量基线及视频服务限制见 [M5 逐项验收记录](knowledge-base/m5-acceptance.md)。
+
+### M6 双课与重启验收
+
+复跑多课程验收时，在独立试用环境启动前设置 `$env:REVIEW_VIDEO_API='http://127.0.0.1:18442'`，使后端使用测试脚本提供的模拟源。同一测试库只运行一个视频检索后端。在第二个终端执行以下命令，完成 prepare 后重启连接同一库的试用 Java，再执行 verify。
+
+```powershell
+$env:REVIEW_TEST_URL = 'http://127.0.0.1:18085'
+python -m unittest discover -s m6-tests -v
+node m6-tests/multi-course.mjs prepare
+# 重启独立试用 Java 后
+node m6-tests/multi-course.mjs verify
+```
 
 ## M4 课程参考视频
 

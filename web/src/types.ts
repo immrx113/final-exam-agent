@@ -152,3 +152,5 @@ export function formatBatchLabel(jobs: string[], jobId: string): string {
   if (index >= 0) return `第 ${jobs.length - index} 批`;
   return jobId ? `批次 #${jobId.slice(0, 6)}` : "未定批次";
 }
+
+export type CourseSummary = { id: string; name: string; hasPublished: boolean };

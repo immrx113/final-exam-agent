@@ -1,3 +1,4 @@
+import { useCourseBase } from "./api";
 import { useEffect, useState } from "react";
 import { ExternalIcon } from "./TopicCard";
 import type { VideoState } from "./types";
@@ -8,6 +9,7 @@ export type VideosProps = {
 };
 
 export function Videos({ version, batchLabel }: VideosProps) {
+  const base = useCourseBase();
   const [state, setState] = useState<VideoState | null>(null);
   const [error, setError] = useState(false);
   const [attempt, setAttempt] = useState(0);
@@ -15,7 +17,7 @@ export function Videos({ version, batchLabel }: VideosProps) {
   useEffect(() => {
     const controller = new AbortController();
     let timer: ReturnType<typeof setTimeout>;
-    const url = "/api/course/versions/" + version + "/videos";
+    const url = base + "/versions/" + version + "/videos";
 
     async function load(retry: boolean) {
       try {
@@ -115,12 +117,13 @@ export function Videos({ version, batchLabel }: VideosProps) {
 
       {!pending &&
         !error &&
-        state?.status === "ready" &&
+        (state?.status === "ready" || state?.status === "retry_empty") &&
         state.items.length === 0 && (
           <div className="empty-state video-empty">
             <p className="empty-state-title" role="status">
               {state.reason || "暂无匹配视频"}
             </p>
+            {state.status === "retry_empty" && <button className="sub" onClick={handleRetry}>重试视频检索</button>}
             <p className="empty-state-guide">
               {state.reason === "暂无可推荐的知识点"
                 ? "当前版本尚无正命中或已入计划的知识点，补充匹配试卷或教学讲义后重新分析即可自动检索。"

@@ -1,3 +1,4 @@
+import { useCourseBase } from "./api";
 import { useState, type ReactNode } from "react";
 import type { StudyState, Topic } from "./types";
 
@@ -192,7 +193,8 @@ export function Study({
   onConflictChange,
   detail,
 }: StudyProps) {
-  const url = "/api/course/versions/" + version + "/states";
+  const base = useCourseBase();
+  const url = base + "/versions/" + version + "/states";
 
   if (failed) {
     return (

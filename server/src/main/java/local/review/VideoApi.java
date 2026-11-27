@@ -8,14 +8,16 @@ import org.springframework.web.bind.annotation.*;
 import org.springframework.web.server.ResponseStatusException;
 
 @RestController
-@RequestMapping("/api/course/versions/{version}/videos")
+@RequestMapping({"/api/course", "/api/courses/{course}"})
 class VideoApi {
+  private final CourseMapper courses;
   private final VideoMapper jobs;
   private final AnalysisMapper analysis;
   private final VideoSource source;
   private final ObjectMapper json;
 
-  VideoApi(VideoMapper jobs, AnalysisMapper analysis, VideoSource source, ObjectMapper json) {
+  VideoApi(CourseMapper courses, VideoMapper jobs, AnalysisMapper analysis, VideoSource source, ObjectMapper json) {
+    this.courses = courses;
     this.jobs = jobs;
     this.analysis = analysis;
     this.source = source;
@@ -24,8 +26,14 @@ class VideoApi {
 
   record State(String status, String reason, List<VideoRules.Item> items) {}
 
-  @GetMapping
-  State read(@PathVariable UUID version) throws Exception {
+  private void requireVersion(String course, UUID version) {
+    if (!analysis.ownsVersion(courses.require(course).id(), version.toString()))
+      throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+  }
+
+  @GetMapping("/versions/{version}/videos")
+  State read(@PathVariable(name="course", required=false) String course, @PathVariable UUID version) throws Exception {
+    requireVersion(course, version);
     String id = version.toString();
     var row = jobs.state(id);
     if (row == null || row.status() == null) {
@@ -40,22 +48,24 @@ class VideoApi {
     return new State(row.status(), report.reason(), report.items());
   }
 
-  @PostMapping(value = "/retry", headers = "X-Review-Request=1")
-  State retry(@PathVariable UUID version) throws Exception {
+  @PostMapping(value = "/versions/{version}/videos/retry", headers = "X-Review-Request=1")
+  State retry(@PathVariable(name="course", required=false) String course, @PathVariable UUID version) throws Exception {
+    requireVersion(course, version);
     jobs.retry(version.toString());
-    return read(version);
+    return read(course, version);
   }
 
   @Scheduled(fixedDelay = 1000)
   void process() throws Exception {
-    String version = jobs.next();
-    if (version == null) return;
+    var pending = jobs.next();
+    if (pending == null) return;
+    String version = pending.versionId();
     String token = UUID.randomUUID().toString();
     if (jobs.claim(version, token) == 0) return;
     State state;
     try {
       var result = json.readValue(analysis.result(version), AnalysisApi.Result.class);
-      state = source.lookup(VideoRules.priority(result));
+      state = source.lookup(pending.courseName(), VideoRules.priority(result));
     } catch (InterruptedException e) {
       Thread.currentThread().interrupt();
       return;

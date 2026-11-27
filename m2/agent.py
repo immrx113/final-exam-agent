@@ -1,4 +1,5 @@
 """Extract review candidates from one imported batch. All references are M1 segment IDs."""
+import general
 import hashlib
 import json
 import os
@@ -48,10 +49,10 @@ def semantic_matches(pending, topics, batch):
                 group[match["segment"]][0]["matches"].append(match["concept"])
 
 
-def lines(file):
+def lines(file, normalize=clean):
     for source in file["segments"]:
         for raw in source["body"].splitlines() or [""]:
-            yield clean(raw), source
+            yield normalize(raw), source
 
 
 def analyze(batch):
@@ -81,10 +82,13 @@ def analyze(batch):
             if ref not in entry["refs"]:
                 entry["refs"].append(ref)
 
-    exams = []
-    for file in sorted(batch["files"], key=lambda f: f["role"] != "courseware"):
+    ordered = sorted(batch["files"], key=lambda f: f["role"] != "courseware")
+    generic = batch.get("profile") == "general"
+    aliases = general.teach(ordered, topic, review) if generic else {}
+    normalize = general.normal if generic else clean
+    exams = [f for f in ordered if f["role"] == "exam"]
+    for file in ([] if generic else ordered):
         if file["role"] == "exam":
-            exams.append(file)
             continue
         chapter = "待归类"
         heading = None
@@ -133,11 +137,12 @@ def analyze(batch):
                 elif explanatory(text.replace(name, "", 1)) and PROSE.search(text):
                     topic(name, chapter, text, [ref], rank=1)
 
-    exam_terms = term_patterns([*topics, *CORE])
+    vocabulary = list(aliases) if generic else list(CORE)
+    exam_terms = term_patterns([*topics, *vocabulary]) if topics or vocabulary else None
     seen_text = set()
     for file in exams:
         refs = [s["id"] for s in file["segments"]]
-        title_text = clean(file["segments"][0]["body"]) if file["segments"] else ""
+        title_text = normalize(file["segments"][0]["body"]) if file["segments"] else ""
         named_single_page = ("试卷" in title_text and re.search(r"共\s*1\s*页", title_text))
         if file["kind"] == "image" and not named_single_page:
             review("单张扫描图的试卷归属待核对", refs)
@@ -149,11 +154,22 @@ def analyze(batch):
         seen_text.add(signature)
         candidates = []
         parent = current = None
-        for text, source in lines(file):
+        section, term_section = "", False
+        for text, source in lines(file, normalize):
             text = re.sub(r"^#{1,6}\s+", "", text)
+            if generic and (header := general.SECTION.match(text)):
+                section = header[1]
+                term_section = header[2] in {"名词解释", "概念题", "术语解释"}
+                current = parent = None
+                continue
             major, minor = NUMBER.match(text), SUB.match(text)
+            if generic and term_section and minor:
+                text = minor[1] + ". " + minor[2]
+                major = NUMBER.match(text)
             if major:
                 label = major[1] or major[2]
+                if section:
+                    label = section + "-" + label
                 current = {"label": label, "parts": [], "children": False}
                 parent = current
                 candidates.append(current)
@@ -168,6 +184,7 @@ def analyze(batch):
                 if source["review"]:
                     review("无法辨认题号", [source["id"]])
                 continue
+            current["term_section"] = term_section
             current["parts"].append((text, source))
 
         # Dependent subparts share the parent's counting unit and its source locations.
@@ -187,20 +204,31 @@ def analyze(batch):
             context = q.get("parent", {}).get("parts", []) + parts
             evidence = list(dict.fromkeys(s["id"] for _, s in context))
             body = "".join(t for t, _ in parts)
-            if q["label"] in seen_labels or any(s["review"] for _, s in context) or len(body.strip()) < 3:
+            short_term = None
+            if q.get("term_section"):
+                candidate = general.SCORE.sub("", body).strip(" 。?")
+                if general.valid(candidate):
+                    short_term = aliases.get(candidate, candidate)
+            if q["label"] in seen_labels or any(s["review"] for _, s in context) or (len(body.strip()) < 3 and not short_term):
                 review("题号重复或题干识别存疑", evidence)
                 continue
             seen_labels.add(q["label"])
             task = re.sub(
                 r"(?:无需|不涉及|不考查|不要求|不用|不考虑|背景知识|仅作背景|仅作示例|"
                 r"仅提到|仅提及|曾提到|曾提及)[^，。；,;]*", "", body)
-            matches = list(dict.fromkeys(exam_terms.findall(task)))
-            if not matches and (asked := ASKED_CONCEPT.fullmatch(task)) and noun(asked[1]):
+            matches = list(dict.fromkeys(aliases.get(n, n) for n in exam_terms.findall(task))) if exam_terms else []
+            if short_term:
+                matches = [short_term]
+            if generic and not matches and (asked := general.ASKED.fullmatch(task)):
+                name = asked[1]
+                if general.valid(name) and general.SUFFIX.search(name):
+                    matches = [name]
+            if not generic and not matches and (asked := ASKED_CONCEPT.fullmatch(task)) and noun(asked[1]):
                 matches = [asked[1]]
             for name in matches:
                 if name not in topics:
                     topic(name, "待归类", "试题涉及" + name + "，教学资料中尚未找到定义。", [])
-                    exam_terms = term_patterns([*topics, *CORE])
+                    exam_terms = term_patterns([*topics, *vocabulary])
             question = {"file": file["id"], "label": q["label"], "refs": evidence, "matches": matches}
             questions.append(question)
             if not matches:

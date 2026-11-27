@@ -27,6 +27,36 @@
   },
   "documents": [
     {
+      "path": "knowledge-base/multi-course-requirements.md",
+      "title": "多课程学习支持 · 需求与验收（M6）",
+      "status": "active",
+      "status_reason": "已按用户确认口径实施 M6，完成独立库迁移、浏览器、重启与已有回归核验。",
+      "verification_state": "verified",
+      "verified_on": "2026-11-27",
+      "verification_scope": "M6-01～M6-08 产品范围与文末自制样本验收。真实视频核验覆盖目录后备，公开关键词成功路径仍待验。",
+      "verification_evidence": [
+        "用户在审查两处产品分歧后回复“采纳”。",
+        "对照 V1～V4、Spring 控制器与 Mapper、React 工作台、M0/M2 分析器及 M1～M5 测试契约。",
+        "MySQL 8.4 试用库 V4→V5 和独立空库 V1→V5 实测；M6 Edge 脚本 prepare / 重启 Java / verify。",
+        "前后端构建、M1～M5 原有规则与浏览器脚本、两份 holdout 和 4 项通用课程用例；具体环境、计时与公开搜索限制见 development-notes.md 的 M6 实测。"
+      ]
+    },
+    {
+      "path": "knowledge-base/multi-course-design.md",
+      "title": "多课程学习支持 · 轻量技术方案与实施规划（M6）",
+      "status": "active",
+      "status_reason": "已按用户确认口径实施 M6，完成独立库迁移、浏览器、重启与已有回归核验。",
+      "verification_state": "verified",
+      "verified_on": "2026-11-27",
+      "verification_scope": "四步实现的存量及空库迁移、课程路由与快照归属、通用两趟提取、顶栏及工作区隔离、模拟视频源、真实重启与 M1～M5 回归。第 2 节 SQL 与实施记录描述落地实现，其余模块清单为设计方案。真实视频核验覆盖目录后备，公开关键词成功路径仍待验。",
+      "verification_evidence": [
+        "用户在审查两处产品分歧后回复“采纳”。",
+        "对照 V1～V4、Spring 控制器与 Mapper、React 工作台、M0/M2 分析器及 M1～M5 测试契约。",
+        "MySQL 8.4 试用库 V4→V5 和独立空库 V1→V5 实测；M6 Edge 脚本 prepare / 重启 Java / verify。",
+        "前后端构建、M1～M5 原有规则与浏览器脚本、两份 holdout 和 4 项通用课程用例；具体环境、计时与公开搜索限制见 development-notes.md 的 M6 实测。"
+      ]
+    },
+    {
       "path": "knowledge-base/frontend-refactor-plan.md",
       "title": "个人期末复习助手 · 前端重构开发规划",
       "status": "active",
@@ -70,7 +100,7 @@
       "path": "knowledge-base/development-notes.md",
       "title": "开发问题与性能优化记录",
       "status": "draft",
-      "status_reason": "已记录 M3 笔记定位、M4 公开搜索受限、M5 扫描卷归属、前端重构文件选择标签精确匹配、四页签与参考计划严格定位器隔离，以及独立参考视频区严格契约与固定视频源队列隔离问题，待作为开发依据前核验。",
+      "status_reason": "持续积累开发记录。M6 已实测的条件与结果见对应条目及 M6 需求、设计的核验登记，其他历史记录保留草稿状态。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,
