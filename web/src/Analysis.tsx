@@ -28,6 +28,9 @@ export type AnalysisProps = {
   selectedJob: string;
   publishedBatchLabel: string;
   onSelectPublishedJob: () => void;
+  studyDrafts: Record<string, string>;
+  onStudyDraftChange: (version: string, topicId: string, value: string) => void;
+  onClearStudyDraft: (version: string, topicId: string) => void;
 };
 
 export function Analysis({
@@ -37,6 +40,9 @@ export function Analysis({
   selectedJob,
   publishedBatchLabel,
   onSelectPublishedJob,
+  studyDrafts,
+  onStudyDraftChange,
+  onClearStudyDraft,
 }: AnalysisProps) {
   const base = useCourseBase();
   const [view, setView] = useState<ViewMode>("rank");
@@ -57,7 +63,6 @@ export function Analysis({
   > | null>(null);
   const [studyFailed, setStudyFailed] = useState(false);
   const [studyAttempt, setStudyAttempt] = useState(0);
-  const [studyDrafts, setStudyDrafts] = useState<Record<string, string>>({});
   const [studyConflicts, setStudyConflicts] = useState<Record<string, boolean>>(
     {},
   );
@@ -84,7 +89,6 @@ export function Analysis({
     setExpandedPlanSteps(new Set());
     setStudyStates(null);
     setStudyFailed(false);
-    setStudyDrafts({});
     setStudyConflicts({});
     setPendingFocusTopicId(null);
   }, [version]);
@@ -175,16 +179,13 @@ export function Analysis({
   }
 
   function handleDraftChange(topicId: string, value: string) {
-    setStudyDrafts((prev) => ({ ...prev, [topicId]: value }));
+    if (!version) return;
+    onStudyDraftChange(version, topicId, value);
   }
 
   function handleClearDraft(topicId: string) {
-    setStudyDrafts((prev) => {
-      if (!(topicId in prev)) return prev;
-      const next = { ...prev };
-      delete next[topicId];
-      return next;
-    });
+    if (!version) return;
+    onClearStudyDraft(version, topicId);
   }
 
   function handleConflictChange(topicId: string, value: boolean) {

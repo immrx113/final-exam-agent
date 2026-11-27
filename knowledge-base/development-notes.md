@@ -50,6 +50,12 @@
 - **规则回归。** 启用本机 BGE 后，数据库原有 8 项与新增通用课程 4 项用例全部通过。关闭语义时通过全部规则用例，各跳过 1 项语义专项。规则与语义两种配置下，M2 独立卷均命中 4/5 个关联、零误配，M5 均为查准 4/4、召回 4/6，2/5 题待核对。
 - **浏览器与服务。** 两个 MySQL 试用库分别验证旧数据和新课程。双课 Edge 脚本通过 prepare 与真实重启后的 verify。M1 的 11 文件原件字节、OCR 与页码通过；M2 浏览器、展示规则及 502/504 注入通过；M3 笔记冲突、导出、重启和失败恢复通过；M4 固定源的重试及迟到结果隔离通过。真实关键词返回 HTTP 412，BV 目录成功打开第 8 个分 P。M5 自制混合课程、恢复与 UI-01～UI-05 通过。复用已有试用批次时，两次 M5 导入就绪/分析分别为 620/278 ms 和 228/221 ms。M1 PDF/OCR、页文本与 MinerU 契约及 M3/M4 Java 规则测试均通过。
 
+## 2026-11-27 · 课程切换浮层交互命中、Esc 捕获分层与已发布态瞬时闪烁修复
+
+- **背景与问题**：在升级右上角一体化课程切换浮层（`CourseSwitcher.tsx`）、自建课程悬停重命名/删除与跨课草稿暂存时，端到端回归暴露出三处交互与时序边界：（1）课程行右侧的「重命名」「删除」按钮若同时设置 `opacity: 0; pointer-events: none` 并仅在 `:hover` 恢复 `pointer-events: auto`，Playwright 指针命中检测及支持触控+触控板的混合设备直接点击按钮坐标时会被父级 `<li class="course-menu-item">` 拦截；（2）当右侧「页内原文对照」抽屉（`EvidenceDrawer`）与顶栏课程浮层同时打开时，按 `Escape` 若走常规冒泡阶段会同时触发 `window` 上的抽屉关闭监听，误关正在阅读的原文面板；（3）已发布课程初次加载或切回重挂载期间，`publishedSnapshot` 异步请求尚未返回前的十余毫秒内 `Boolean(publishedSnapshot)` 为 `false`，导致导入区短暂渲染三栏展开卡再跳变为单行快捷导入条，若在该窗口期内立即向 `<input type="file">` 注入文件会因控件卸载重挂载丢失首份草稿。
+- **解决方案**：（1）移除 `.course-row-actions` 上的 `pointer-events: none`，常态仅通过 `opacity: 0` 保持视觉极简，悬停、`:focus-within` 与 `hover: none` 触屏下显式浮现，兼顾干净视觉与直接点击可达；（2）`CourseSwitcher` 打开期间在 `window` 捕获阶段（`useCapture = true`）监听 `Escape` 并调用 `stopImmediatePropagation()`，仅关闭顶层课程浮层并将焦点归还触发胶囊，保护底层 `EvidenceDrawer` 不受影响；（3）在 `Workspace` 中结合列表接口已知的 `course.hasPublished`（`Boolean(publishedSnapshot) || (initialLoading && course.hasPublished)`）决定导入栏初始展开态，并在快照读取或新发布后同步更新 `courses` 状态，彻底消除已发布课程挂载时的布局跳变与文件输入竞态。
+- **验证结果**：在独立试用环境运行 `CourseRulesTest`、`ui-refactor.mjs`、`m2-tests/visibility.mjs`、`m6-tests/multi-course.mjs`（`prepare` + 真实重启 Java + `verify`，覆盖 Esc 双层叠加、草稿恢复、悬停改名、二次确认删除及 390px/1280px 视口检测）以及 `m2-tests/browser.mjs`、`m2-tests/edges.mjs`、`m3-tests/course.mjs` 全部一次通过。
+
 ## 条目模板
 
 - **日期与模块**：问题发生在哪个阶段、哪个功能或模块？

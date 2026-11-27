@@ -1,12 +1,19 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useRef, useState, type SetStateAction } from "react";
 import { createRoot } from "react-dom/client";
 import "./style.css";
 import { Analysis } from "./Analysis";
+import { CourseSwitcher } from "./CourseSwitcher";
 import { ImportWorkspace } from "./ImportWorkspace";
 import { Videos } from "./Videos";
 import {
   courseApi,
-  defaultCourse, CurrentCourse, useCourseBase, listCourses, createCourse,
+  defaultCourse,
+  CurrentCourse,
+  useCourseBase,
+  listCourses,
+  createCourse,
+  renameCourse,
+  deleteCourse,
   errorMessage,
   fetchPublishedAnalysis,
   runBatchAnalysis,
@@ -21,17 +28,43 @@ import {
   type Snapshot,
 } from "./types";
 
-function Workspace({ course }: { course: CourseSummary }) {
+const EMPTY_DRAFT_FILES: DraftFile[] = [];
+const EMPTY_PICKED: string[] = [];
+const EMPTY_STUDY_DRAFTS: Record<string, string> = {};
+
+type WorkspaceProps = {
+  course: CourseSummary;
+  draft: DraftFile[];
+  picked: string[];
+  studyDraftsByScope: Record<string, Record<string, string>>;
+  onUpdateDraft: (updater: SetStateAction<DraftFile[]>) => void;
+  onUpdatePicked: (updater: SetStateAction<string[]>) => void;
+  onStudyDraftChange: (version: string, topicId: string, value: string) => void;
+  onClearStudyDraft: (version: string, topicId: string) => void;
+  onCoursePublishedChange: (hasPublished: boolean) => void;
+};
+
+function Workspace({
+  course,
+  draft,
+  picked,
+  studyDraftsByScope,
+  onUpdateDraft,
+  onUpdatePicked,
+  onStudyDraftChange,
+  onClearStudyDraft,
+  onCoursePublishedChange,
+}: WorkspaceProps) {
   const base = useCourseBase();
   const mounted = useRef(true);
   useEffect(() => {
     mounted.current = true;
-    return () => { mounted.current = false; };
+    return () => {
+      mounted.current = false;
+    };
   }, []);
   const batchKey = "selected-job:" + course.id;
-  const [draft, setDraft] = useState<DraftFile[]>([]);
   const [saved, setSaved] = useState<SavedFile[]>([]);
-  const [picked, setPicked] = useState<string[]>([]);
   const [jobs, setJobs] = useState<string[]>([]);
   const [selectedJob, setSelectedJob] = useState("");
   const [items, setItems] = useState<BatchItem[]>([]);
@@ -71,8 +104,19 @@ function Workspace({ course }: { course: CourseSummary }) {
       .then(([fileList, jobList]) => {
         if (!live) return;
         setSaved(fileList);
+        const validIds = new Set(fileList.map((f) => f.id));
+        onUpdatePicked((prev) =>
+          prev.every((fid) => validIds.has(fid))
+            ? prev
+            : prev.filter((fid) => validIds.has(fid)),
+        );
         setJobs(jobList);
-        const remembered = sessionStorage.getItem(batchKey) ?? (course.id === "default" ? sessionStorage.getItem("selected-job") : "") ?? "";
+        const remembered =
+          sessionStorage.getItem(batchKey) ??
+          (course.id === "default"
+            ? sessionStorage.getItem("selected-job")
+            : "") ??
+          "";
         const nextJob = jobList.includes(remembered)
           ? remembered
           : jobList[0] || "";
@@ -87,6 +131,7 @@ function Workspace({ course }: { course: CourseSummary }) {
       .then((snap) => {
         if (live && token === analysisGeneration.current) {
           setPublishedSnapshot(snap);
+          onCoursePublishedChange(Boolean(snap));
           setAnalysisError("");
         }
       })
@@ -162,8 +207,8 @@ function Workspace({ course }: { course: CourseSummary }) {
         }
       }
       if (!mounted.current) return;
-      setDraft(failedDrafts);
-      setPicked([...ids]);
+      onUpdateDraft(failedDrafts);
+      onUpdatePicked([...ids]);
       setSaved((old) =>
         Array.from(new Map([...old, ...added].map((f) => [f.id, f])).values()),
       );
@@ -173,16 +218,19 @@ function Workspace({ course }: { course: CourseSummary }) {
           headers: { "Content-Type": "application/json" },
           body: JSON.stringify({ files: [...ids] }),
         });
+        if (!mounted.current) return;
         setJobs((prev) => (prev.includes(id) ? prev : [id, ...prev]));
         selectJob(id);
         setPollTick((n) => n + 1);
-        setPicked([]);
+        onUpdatePicked([]);
       }
     } catch (e) {
       errors.push(errorMessage(e));
     } finally {
-      setImportError(errors.join("\n"));
-      setSubmitting(false);
+      if (mounted.current) {
+        setImportError(errors.join("\n"));
+        setSubmitting(false);
+      }
     }
   }
 
@@ -211,6 +259,7 @@ function Workspace({ course }: { course: CourseSummary }) {
       const snap = await runBatchAnalysis(base, selectedJob);
       if (token === analysisGeneration.current) {
         setPublishedSnapshot(snap);
+        onCoursePublishedChange(true);
       }
     } catch (e) {
       if (token === analysisGeneration.current) {
@@ -253,11 +302,18 @@ function Workspace({ course }: { course: CourseSummary }) {
     ? formatBatchLabel(jobs, publishedSnapshot.job)
     : "";
 
+  const activeStudyDrafts = publishedSnapshot
+    ? (studyDraftsByScope[course.id + ":" + publishedSnapshot.version] ??
+      EMPTY_STUDY_DRAFTS)
+    : EMPTY_STUDY_DRAFTS;
+
   return (
     <>
-
-
-      <h1 className={publishedSnapshot ? "course-title is-compact" : "course-title"}>
+      <h1
+        className={
+          publishedSnapshot ? "course-title is-compact" : "course-title"
+        }
+      >
         {course.name}
       </h1>
 
@@ -269,7 +325,9 @@ function Workspace({ course }: { course: CourseSummary }) {
         selectedJob={selectedJob}
         items={items}
         publishedJob={publishedSnapshot?.job ?? null}
-        hasPublished={Boolean(publishedSnapshot)}
+        hasPublished={
+          Boolean(publishedSnapshot) || (initialLoading && course.hasPublished)
+        }
         submitting={submitting}
         importError={importError}
         pollError={pollError}
@@ -277,7 +335,7 @@ function Workspace({ course }: { course: CourseSummary }) {
         analysisError={analysisError}
         canAnalyze={canAnalyze}
         onAddDrafts={(role: Role, files: File[]) =>
-          setDraft((prev) => [
+          onUpdateDraft((prev) => [
             ...prev,
             ...files.map((file) => ({
               key: crypto.randomUUID(),
@@ -287,15 +345,15 @@ function Workspace({ course }: { course: CourseSummary }) {
           ])
         }
         onChangeDraftRole={(key: string, role: Role) =>
-          setDraft((prev) =>
+          onUpdateDraft((prev) =>
             prev.map((d) => (d.key === key ? { ...d, role } : d)),
           )
         }
         onRemoveDraft={(key: string) =>
-          setDraft((prev) => prev.filter((d) => d.key !== key))
+          onUpdateDraft((prev) => prev.filter((d) => d.key !== key))
         }
         onTogglePicked={(fileId: string, checked: boolean) =>
-          setPicked((prev) =>
+          onUpdatePicked((prev) =>
             checked ? [...prev, fileId] : prev.filter((id) => id !== fileId),
           )
         }
@@ -318,6 +376,9 @@ function Workspace({ course }: { course: CourseSummary }) {
             selectJob(publishedSnapshot.job);
           }
         }}
+        studyDrafts={activeStudyDrafts}
+        onStudyDraftChange={onStudyDraftChange}
+        onClearStudyDraft={onClearStudyDraft}
       />
 
       {publishedSnapshot && (
@@ -333,14 +394,25 @@ function Workspace({ course }: { course: CourseSummary }) {
 
 function App() {
   const [courses, setCourses] = useState<CourseSummary[]>([]);
-  const [id, setId] = useState(() => sessionStorage.getItem("selected-course") ?? "default");
-  const [creating, setCreating] = useState(false);
-  const [name, setName] = useState("");
-  const [error, setError] = useState("");
-  const [busy, setBusy] = useState(false);
-  const course = courses.find(c => c.id === id) ?? defaultCourse;
+  const [id, setId] = useState(
+    () => sessionStorage.getItem("selected-course") ?? "default",
+  );
+  const [importDraftsByCourse, setImportDraftsByCourse] = useState<
+    Record<string, DraftFile[]>
+  >({});
+  const [pickedByCourse, setPickedByCourse] = useState<
+    Record<string, string[]>
+  >({});
+  const [studyDraftsByScope, setStudyDraftsByScope] = useState<
+    Record<string, Record<string, string>>
+  >({});
 
-  useEffect(() => { void listCourses().then(setCourses); }, []);
+  const course = courses.find((c) => c.id === id) ?? defaultCourse;
+
+  useEffect(() => {
+    void listCourses().then(setCourses);
+  }, []);
+
   useEffect(() => {
     if (courses.length) {
       document.title = course.name + " · 个人期末复习助手";
@@ -348,21 +420,121 @@ function App() {
     }
   }, [course, courses]);
 
-  async function submit(event: React.FormEvent) {
-    event.preventDefault();
-    if (busy) return;
-    if (!name.trim()) { setError("请输入课程名称"); return; }
-    setBusy(true);
-    try {
-      const row = await createCourse(name);
-      setCourses(old => [...old, row]);
-      setId(row.id);
-      setCreating(false);
-    } catch (e) { setError(errorMessage(e)); }
-    finally { setBusy(false); }
+  function updateCourseDraft(
+    courseId: string,
+    updater: SetStateAction<DraftFile[]>,
+  ) {
+    setImportDraftsByCourse((prev) => {
+      const current = prev[courseId] ?? EMPTY_DRAFT_FILES;
+      const next = typeof updater === "function" ? updater(current) : updater;
+      if (next === current) return prev;
+      if (next.length === 0) {
+        if (!(courseId in prev)) return prev;
+        const copy = { ...prev };
+        delete copy[courseId];
+        return copy;
+      }
+      return { ...prev, [courseId]: next };
+    });
   }
 
-  return <main>
+  function updateCoursePicked(
+    courseId: string,
+    updater: SetStateAction<string[]>,
+  ) {
+    setPickedByCourse((prev) => {
+      const current = prev[courseId] ?? EMPTY_PICKED;
+      const next = typeof updater === "function" ? updater(current) : updater;
+      if (next === current) return prev;
+      if (next.length === 0) {
+        if (!(courseId in prev)) return prev;
+        const copy = { ...prev };
+        delete copy[courseId];
+        return copy;
+      }
+      return { ...prev, [courseId]: next };
+    });
+  }
+
+  function handleStudyDraftChange(
+    courseId: string,
+    version: string,
+    topicId: string,
+    value: string,
+  ) {
+    const scope = courseId + ":" + version;
+    setStudyDraftsByScope((prev) => ({
+      ...prev,
+      [scope]: {
+        ...(prev[scope] ?? EMPTY_STUDY_DRAFTS),
+        [topicId]: value,
+      },
+    }));
+  }
+
+  function handleClearStudyDraft(
+    courseId: string,
+    version: string,
+    topicId: string,
+  ) {
+    const scope = courseId + ":" + version;
+    setStudyDraftsByScope((prev) => {
+      const existing = prev[scope];
+      if (!existing || !(topicId in existing)) return prev;
+      const nextScope = { ...existing };
+      delete nextScope[topicId];
+      const next = { ...prev };
+      if (Object.keys(nextScope).length === 0) {
+        delete next[scope];
+      } else {
+        next[scope] = nextScope;
+      }
+      return next;
+    });
+  }
+
+  async function handleCreateCourse(name: string) {
+    const row = await createCourse(name);
+    setCourses((old) => [...old, row]);
+    setId(row.id);
+  }
+
+  async function handleRenameCourse(courseId: string, name: string) {
+    const updated = await renameCourse(courseId, name);
+    setCourses((old) => old.map((c) => (c.id === courseId ? updated : c)));
+  }
+
+  async function handleDeleteCourse(courseId: string) {
+    await deleteCourse(courseId);
+    setCourses((old) => old.filter((c) => c.id !== courseId));
+    setImportDraftsByCourse((prev) => {
+      if (!(courseId in prev)) return prev;
+      const copy = { ...prev };
+      delete copy[courseId];
+      return copy;
+    });
+    setPickedByCourse((prev) => {
+      if (!(courseId in prev)) return prev;
+      const copy = { ...prev };
+      delete copy[courseId];
+      return copy;
+    });
+    setStudyDraftsByScope((prev) => {
+      const prefix = courseId + ":";
+      const keys = Object.keys(prev).filter((k) => k.startsWith(prefix));
+      if (keys.length === 0) return prev;
+      const copy = { ...prev };
+      for (const k of keys) delete copy[k];
+      return copy;
+    });
+    sessionStorage.removeItem("selected-job:" + courseId);
+    if (id === courseId) {
+      setId("default");
+    }
+  }
+
+  return (
+    <main>
       <header className="masthead">
         <div className="masthead-brand">
           <span className="brand-title">期末复习助手</span>
@@ -371,26 +543,46 @@ function App() {
           </span>
           <span className="brand-sub">本机多课程工作台</span>
         </div>
-        <div className="course-actions">
-          <select aria-label="当前课程" value={course.id} disabled={!courses.length || busy}
-            onChange={e => { setId(e.target.value); setCreating(false); }}>
-            {(courses.length ? courses : [defaultCourse]).map(c => <option key={c.id} value={c.id}>{c.name}</option>)}
-          </select>
-          <button type="button" className="sub" disabled={!courses.length || busy}
-            onClick={() => { setCreating(true); setError(""); setName(""); }}>新建课程</button>
-        </div>
+        <CourseSwitcher
+          courses={courses.length ? courses : [defaultCourse]}
+          currentCourse={course}
+          disabled={!courses.length}
+          onSelectCourse={setId}
+          onCreateCourse={handleCreateCourse}
+          onRenameCourse={handleRenameCourse}
+          onDeleteCourse={handleDeleteCourse}
+        />
       </header>
-    {creating && <form className="course-form" onSubmit={submit}
-      onKeyDown={e => { if (e.key === "Escape" && !busy) setCreating(false); }}>
-      <label>新课程名称 <input autoFocus value={name} onChange={e => setName(e.target.value)} /></label>
-      <button disabled={busy}>创建课程</button>
-      <button type="button" className="sub" disabled={busy} onClick={() => setCreating(false)}>取消</button>
-      {error && <p role="alert">{error}</p>}
-    </form>}
-    {courses.length > 0 && <CurrentCourse.Provider value={course}>
-      <Workspace key={course.id} course={course} />
-    </CurrentCourse.Provider>}
-  </main>;
+      {courses.length > 0 && (
+        <CurrentCourse.Provider value={course}>
+          <Workspace
+            key={course.id}
+            course={course}
+            draft={importDraftsByCourse[course.id] ?? EMPTY_DRAFT_FILES}
+            picked={pickedByCourse[course.id] ?? EMPTY_PICKED}
+            studyDraftsByScope={studyDraftsByScope}
+            onUpdateDraft={(updater) => updateCourseDraft(course.id, updater)}
+            onUpdatePicked={(updater) => updateCoursePicked(course.id, updater)}
+            onStudyDraftChange={(version, topicId, value) =>
+              handleStudyDraftChange(course.id, version, topicId, value)
+            }
+            onClearStudyDraft={(version, topicId) =>
+              handleClearStudyDraft(course.id, version, topicId)
+            }
+            onCoursePublishedChange={(hasPublished) =>
+              setCourses((old) =>
+                old.map((c) =>
+                  c.id === course.id && c.hasPublished !== hasPublished
+                    ? { ...c, hasPublished }
+                    : c,
+                ),
+              )
+            }
+          />
+        </CurrentCourse.Provider>
+      )}
+    </main>
+  );
 }
 
 createRoot(document.getElementById("root")!).render(<App />);

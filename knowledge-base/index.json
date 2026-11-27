@@ -30,30 +30,29 @@
       "path": "knowledge-base/multi-course-requirements.md",
       "title": "多课程学习支持 · 需求与验收（M6）",
       "status": "active",
-      "status_reason": "已按用户确认口径实施 M6，完成独立库迁移、浏览器、重启与已有回归核验。",
+      "status_reason": "已按用户确认口径完成 M6 多课程支持及右上角一体化课程切换浮层、自建课重命名/删除与跨课草稿暂存升级，并通过全套单元、浏览器、重启与回归核验。",
       "verification_state": "verified",
       "verified_on": "2026-11-27",
-      "verification_scope": "M6-01～M6-08 产品范围与文末自制样本验收。真实视频核验覆盖目录后备，公开关键词成功路径仍待验。",
+      "verification_scope": "M6-01～M6-09 产品范围与文末自制样本验收（含一体化切换浮层、自建课程重命名与二次确认级联删除、默认课保护及跨课未保存草稿暂存恢复）。真实视频核验覆盖目录后备，公开关键词成功路径仍待验。",
       "verification_evidence": [
-        "用户在审查两处产品分歧后回复“采纳”。",
-        "对照 V1～V4、Spring 控制器与 Mapper、React 工作台、M0/M2 分析器及 M1～M5 测试契约。",
-        "MySQL 8.4 试用库 V4→V5 和独立空库 V1→V5 实测；M6 Edge 脚本 prepare / 重启 Java / verify。",
-        "前后端构建、M1～M5 原有规则与浏览器脚本、两份 holdout 和 4 项通用课程用例；具体环境、计时与公开搜索限制见 development-notes.md 的 M6 实测。"
+        "2026-11-27 用户在审查多课程范围后回复“采纳”，并在审查右上角课程切换器优化需求清单后回复“确认准确”。",
+        "对照 V1～V5 数据库外键约束、Spring 控制器与 Mapper、React 工作台（CourseSwitcher / main / Analysis）及 M1～M5 测试契约。",
+        "运行 CourseRulesTest、StudyRulesTest、VideoRulesTest 及 Python m2-tests（8 项）、m6-tests（4 项）规则单元用例全部通过。",
+        "在 final-review-m5 独立试用环境通过 ui-refactor.mjs、visibility.mjs、m6-tests/multi-course.mjs（prepare / 真实重启 Java / verify）及 m2-tests/browser.mjs、edges.mjs、m3-tests/course.mjs 回归。"
       ]
     },
     {
       "path": "knowledge-base/multi-course-design.md",
       "title": "多课程学习支持 · 轻量技术方案与实施规划（M6）",
       "status": "active",
-      "status_reason": "已按用户确认口径实施 M6，完成独立库迁移、浏览器、重启与已有回归核验。",
+      "status_reason": "已按用户确认口径实施 M6 及右上角课程切换浮层、后端改名/级联删除与跨课草稿暂存方案，完成单元、浏览器、真实重启与既有回归核验。",
       "verification_state": "verified",
       "verified_on": "2026-11-27",
-      "verification_scope": "四步实现的存量及空库迁移、课程路由与快照归属、通用两趟提取、顶栏及工作区隔离、模拟视频源、真实重启与 M1～M5 回归。第 2 节 SQL 与实施记录描述落地实现，其余模块清单为设计方案。真实视频核验覆盖目录后备，公开关键词成功路径仍待验。",
+      "verification_scope": "存量及空库迁移、课程路由与快照归属、自建课重命名与事务级联删除并发保护、通用两趟提取、一体化顶栏课程切换浮层与跨课草稿暂存、模拟视频源、真实重启与 M1～M5 回归。真实视频核验覆盖目录后备，公开关键词成功路径仍待验。",
       "verification_evidence": [
-        "用户在审查两处产品分歧后回复“采纳”。",
-        "对照 V1～V4、Spring 控制器与 Mapper、React 工作台、M0/M2 分析器及 M1～M5 测试契约。",
-        "MySQL 8.4 试用库 V4→V5 和独立空库 V1→V5 实测；M6 Edge 脚本 prepare / 重启 Java / verify。",
-        "前后端构建、M1～M5 原有规则与浏览器脚本、两份 holdout 和 4 项通用课程用例；具体环境、计时与公开搜索限制见 development-notes.md 的 M6 实测。"
+        "2026-11-27 用户确认课程切换器优化需求后同步设计并完成前后端构建打包。",
+        "CourseRulesTest 验证默认课锁定、名称边界、运行中解析/分析 409 保护、外键逆序级联删除与 Redis 缓存键清理。",
+        "Edge 无头实测 m6-tests/multi-course.mjs prepare / 重启 Java / verify，以及 ui-refactor.mjs、visibility.mjs、m2-tests/browser.mjs、edges.mjs、m3-tests/course.mjs 全量通过；详见 development-notes.md。"
       ]
     },
     {

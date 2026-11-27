@@ -3,9 +3,9 @@
 
 ## Windows 多课程工作台
 
-首次打开时会选中《数据库原理》。从旧版升级后，已有文件、批次、已发布分析和笔记归入这门课。点击顶栏“新建课程”，输入名称并创建，即可为另一门课导入材料。课程名称最多 80 个字符，须唯一，且不能含控制字符或路径分隔符。
+首次打开时会选中《数据库原理》。从旧版升级后，已有文件、批次、已发布分析和笔记归入这门课。点击页面右上角“当前课程”胶囊按钮展开下拉浮层，点击底部“新建课程”输入名称即可创建新课。课程名称最多 80 个字符，须唯一，且不能含控制字符或路径分隔符。自建课程在浮层列表中悬停或键盘聚焦时支持重命名与二次确认删除（内置默认课《数据库原理》锁定保留，不可改名或删除）；重命名不影响已有考点标识与学习笔记，确认删除会级联清理该课程下的文件记录、批次、分析版本与笔记并自动切回《数据库原理》。
 
-用“当前课程”切换课程。切换前请保存正在编辑的笔记。工作台会关闭原文抽屉、清空未提交的文件和编辑草稿，并在同一浏览器标签页分别记住每门课上次选择的批次。两门课中同名的考点各自计数，完成状态和笔记独立保存。
+在下拉浮层中点击其他课程即可切换，按 `Esc` 或点击浮层外部可收起列表。同一页面会话内切换课程时，工作台会自动关闭已打开的原文对照抽屉，同时在内存中按课程分别暂存未提交的本地上传草稿、已上传文件复用勾选与未保存的待办笔记草稿（切回原课程时自动恢复），并在同一浏览器标签页分别记住每门课上次选择的批次。两门课中同名的考点各自计数，完成状态和笔记独立保存。
 
 新课程从本课标题、强调术语、定义及括号别名提取考点。例如课件写“最近最少使用置换算法（LRU）”，试卷写“LRU”即可关联。规则分析在本机运行，可以沿用 M0 的本地 BGE 模型辅助匹配。Markdown 下载只收录本版本的正命中考点，正文显示课名，附件名中的 Windows 非法字符替换为下划线。参考视频使用当前课名和优先考点检索。已有考点但搜索无匹配、也没有本课候选目录时，可以手动重试。
 
@@ -49,6 +49,10 @@ python m5-tests/holdout.py
 ```powershell
 $env:REVIEW_TEST_URL = 'http://127.0.0.1:18085'
 python -m unittest discover -s m6-tests -v
+mvn -q -f server/pom.xml dependency:build-classpath "-Dmdep.outputFile=$PWD/.local/cp.txt"
+$cp = "server/target/classes;server/target/test-classes;" + (Get-Content -Raw .local/cp.txt).Trim()
+javac -encoding UTF-8 -cp $cp -d server/target/test-classes m6-tests/CourseRulesTest.java
+java -cp $cp local.review.CourseRulesTest
 node m6-tests/multi-course.mjs prepare
 # 重启独立试用 Java 后
 node m6-tests/multi-course.mjs verify

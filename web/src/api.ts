@@ -31,6 +31,44 @@ export async function createCourse(name: string): Promise<CourseSummary> {
   return response.json();
 }
 
+export async function renameCourse(id: string, name: string): Promise<CourseSummary> {
+  const response = await fetch("/api/courses/" + encodeURIComponent(id), {
+    method: "PATCH",
+    headers: { "Content-Type": "application/json", "X-Review-Request": "1" },
+    body: JSON.stringify({ name }),
+  });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 409
+        ? "同名课程已存在"
+        : response.status === 400
+          ? "请检查课程名称"
+          : response.status === 404
+            ? "课程不存在或已删除"
+            : "课程重命名失败，请重试",
+    );
+  }
+  return response.json();
+}
+
+export async function deleteCourse(id: string): Promise<void> {
+  const response = await fetch("/api/courses/" + encodeURIComponent(id), {
+    method: "DELETE",
+    headers: { "X-Review-Request": "1" },
+  });
+  if (!response.ok) {
+    throw new Error(
+      response.status === 409
+        ? "该课程正在解析文件或生成分析，请等待完成后再删除"
+        : response.status === 400
+          ? "默认课程不可删除"
+          : response.status === 404
+            ? "课程不存在或已删除"
+            : "课程删除失败，请重试",
+    );
+  }
+}
+
 
 const COURSE_STATUS_MESSAGES: Record<number, string> = {
   400: "请检查文件、名称和用途",

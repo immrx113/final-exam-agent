@@ -108,15 +108,22 @@ ALTER TABLE study_states
 ### 3.1 新增课程管理模块（`CourseMapper.java` + `CourseApi.java`）
 
 - **`CourseMapper`**：
-  - `record CourseRow(String id, String name, String topicNs, String profile) {}`
-  - `record CourseSummary(String id, String name, boolean hasPublished) {}`（左连接 `analysis_versions` 判断是否已有发布结果，按 `courses.seq ASC` 排序使默认课排首位或最近创建可见）。
-  - 提供 `findById(id)`、`listSummaries()`、`insert(row)`。
+  - `record Course(String id, String name, String topicNs, String profile) {}`
+  - `record Summary(String id, String name, boolean hasPublished) {}`（左连接/存在性子查询判断是否有已发布结果，按 `courses.seq ASC` 排序）。
+  - 提供 `find(id)`、`findForUpdate(id)`、`summary(id)`、`list()`、`create(id, name)`、`rename(id, name)`、`hasActiveItems(id)`、`versions(id)` 以及按外键子表到主表顺序清理单课数据的删除语句。
 - **`CourseApi`（`@RequestMapping("/api/courses")`）**：
-  - `GET /api/courses` → `200`，返回 `List<CourseSummary>`；
-  - `POST /api/courses`（需请求头 `X-Review-Request: 1`）→ 请求体 `{"name": "操作系统"}`。
+  - `GET /api/courses` → `200`，返回 `List<CourseMapper.Summary>`；
+  - `POST /api/courses`（需请求头 `X-Review-Request: 1`）→ 请求体 `{"name": "操作系统"}`：
     - 校验：`name == null`、去除首尾空格后为空、长度 `> 80`、含控制字符或 `/`、`\` 时返回 `400 BAD_REQUEST`；
-    - 生成 `id = UUID.randomUUID().toString()`，`topicNs = id`，新建课统一使用 `profile = "general"`，种子课名称已受唯一键保护；
-    - 捕获唯一键冲突 `DuplicateKeyException` 返回 `409 CONFLICT`；成功返回 `201 CREATED` 及新建的 `CourseSummary`。
+    - 生成 `id = UUID.randomUUID().toString()`，`topicNs = id`，新建课统一使用 `profile = "general"`；
+    - 捕获唯一键冲突 `DuplicateKeyException` 返回 `409 CONFLICT`；成功返回 `201 CREATED` 及新建的 `Summary`。
+  - `PATCH /api/courses/{id}`（需请求头 `X-Review-Request: 1`）→ 请求体 `{"name": "操作系统（下）"}`：
+    - `id.equals("default")` 返回 `400 BAD_REQUEST`（保护默认课程名称与数据库专属词包语义）；不存在返回 `404 NOT_FOUND`；
+    - 名称格式校验同 `POST`；若去首尾空白后与原名称一致则直接返回 `200` 及当前 `Summary`；否则更新 `courses.name`（重名捕获 `DuplicateKeyException` 返回 `409 CONFLICT`），保持 `topic_ns` 不变以确保历史知识点 UUID 与学习笔记零损兼容。
+  - `DELETE /api/courses/{id}`（需请求头 `X-Review-Request: 1`）→ 成功返回 `204 NO_CONTENT`：
+    - `id.equals("default")` 返回 `400 BAD_REQUEST`；不存在返回 `404 NOT_FOUND`；
+    - 与 `AnalysisApi` 协同检查该课是否正在执行批次分析，并在事务内对 `courses` 行加排他锁（`FOR UPDATE`）后检查 `items` 是否存在非终态解析任务（`queued` / `processing` / `recheck` / `rechecking`），若忙碌则返回 `409 CONFLICT`；
+    - 在同一事务内依次删除该课程的 `study_states` → `analysis_hits` → `analysis_versions` → `segments` → `items` → `jobs` → `files` → `courses` 记录，并在提交后尽力清除该课各版本的 Redis 缓存键 `review:m2:{version}`（底层 MinIO `original/{digest}` 原件保留，确保跨课同内容文件复用不受影响）。
 
 ### 3.2 改造现有四个业务控制器与 Mapper
 
@@ -206,21 +213,18 @@ ALTER TABLE study_states
    - 新增 `CourseSummary = { id: string; name: string; hasPublished: boolean }`。
 2. **`web/src/api.ts`**：
    - 新增 `courseBase(courseId: string): string`：`courseId === "default" ? "/api/course" : "/api/courses/" + encodeURIComponent(courseId)`；
-   - 新增 `listCourses(): Promise<CourseSummary[]>`（若请求失败或非数组时兜底返回 `[{ id: "default", name: "数据库原理", hasPublished: false }]`）与 `createCourse(name: string): Promise<CourseSummary>`（精细翻译 `400` 名称格式错误与 `409` `"同名课程已存在"`）；
-   - 将 `courseApi`、`fetchPublishedAnalysis`、`runBatchAnalysis` 增加 `courseId` 参数（默认 `"default"`）。
-3. **`web/src/main.tsx`（及可选抽离 `CourseBar.tsx`）**：
-   - 维护 `courses: CourseSummary[]` 与 `currentCourseId: string`（初始从 `sessionStorage.getItem("selected-course") || "default"` 恢复，校验存在于 `courses` 列表中，否则回退首项 `"default"`）。
-   - 顶栏 `.masthead` 改造：
-     - 副标题由 `本机单课程工作台` 升级为 `本机多课程工作台`；
-     - 右侧原静态 `<span className="course-pill">数据库原理</span>` 升级为：
-       1. `<select aria-label="当前课程">`（列出全部课程，切换时调用 `switchCourse(nextId)`）；
-       2. `<button type="button" className="sub">新建课程</button>`（点击展开轻量内联表单或模态框：含 `<input aria-label="新课程名称" maxLength={80}>`、`创建课程`、`取消`、错误提示 `role="alert"` 及 `Esc` 关闭）。
-   - `<h1>` 与 `document.title` 动态绑定 `currentCourse.name`。
-   - **切换课程时的干净重置契约**：
-     - 递增 `analysisGeneration.current` 使上一门课在途请求全部失效；
-     - 清空 `draft`、`picked`、`jobs`、`items`、`publishedSnapshot`、`importError`、`pollError`、`analysisError`；
-     - 批次记忆键改为 `sessionStorage.getItem("selected-job:" + currentCourseId)`（对 `"default"` 兼容回读旧键 `"selected-job"`）；
-     - 为 `<Analysis key={currentCourseId} courseId={currentCourseId} ... />` 与 `<Videos key={currentCourseId + ":" + publishedSnapshot.version} courseId={currentCourseId} ... />` 传入 `courseId`，确保切换课程时自动关闭上一门课的 `EvidenceDrawer`、重置草稿并请求对应课程前缀下的 `/states`、`/export`、`/videos`、`/files/{id}/original`。
+   - 新增 `listCourses()`（请求失败或非数组时兜底返回 `[{ id: "default", name: "数据库原理", hasPublished: false }]`）、`createCourse(name)`、`renameCourse(id, name)` 与 `deleteCourse(id)`（精细翻译 `400` 名称校验错误、`409` `"同名课程已存在"` 或 `"当前课程正在解析或分析，请稍后再试"`）。
+3. **`web/src/CourseSwitcher.tsx` 与 `web/src/main.tsx`**：
+   - 维护 `courses: CourseSummary[]` 与当前选中课程 `id`（初始从 `sessionStorage.getItem("selected-course") || "default"` 恢复，校验存在于 `courses` 列表中，否则回退 `"default"`）。
+   - 顶栏 `.masthead` 右侧升级为一体化 `CourseSwitcher` 组件：
+     - 胶囊触发按钮 `<button type="button" aria-label="当前课程" aria-expanded={open}>` 显示当前课名与下拉箭头；
+     - 点击展开右对齐绝对定位浮层面板（不推挤主布局；捕获阶段监听 `Escape` 键与文档外部点击关闭浮层并将焦点归还触发按钮，避免误关底层已打开的 `EvidenceDrawer`）；
+     - 极简课程列表每行仅展示选中勾号 `✓` 与课程名；对非 `"default"` 的自建课程，在 `:hover` / `:focus-within`（及触屏媒体查询）下于行右侧显式浮现「重命名」「删除」图标按钮，分别切换为浮层内联改名表单与二次确认删除面板；
+     - 浮层底部固定提供「`+ 新建课程`」按钮，点击原地展开内联创建表单（含 `<input aria-label="新课程名称" maxLength={80}>`、`创建课程`、`取消` 与 `role="alert"` 错误提示）。
+   - `<h1>` 与 `document.title` 动态绑定 `course.name`。
+   - **跨课程切换时的草稿暂存与状态隔离**：
+     - 在顶层 `App` 按课程维护内存态 `importDraftsByCourse`（待上传 `DraftFile[]`）、`pickedByCourse`（复用文件勾选 `string[]`）与 `studyDraftsByCourseVersion`（按 `${courseId}:${version}` 索引的待办未保存笔记草稿），切课后重回原课程时原样恢复草稿；删除课程时同步清理对应内存键与 `sessionStorage` 键；
+     - `<Workspace key={course.id}>` 按课程重挂载，确保切换课程时自动关闭上一门课的 `EvidenceDrawer`、清空瞬时错误横幅并取消在途轮询，同时从 `sessionStorage.getItem("selected-job:" + course.id)` 恢复该课上次查看的批次。
 4. **保持全部既有无障碍与测试选择器不变**：
    - `选择课件`、`选择资料`、`选择试卷`、`提交处理`、`[aria-label="处理批次"]`、`分析本批资料`、四页签 `role="tab"`、`页内对照`、`学习笔记 · {考点}`、`保存笔记`、`下载 Markdown 复习文档`、`重试视频检索` 文案与 DOM 层级全部保持不变。
    - 在 `390×844` 与 `1280×800` 视口下校验顶栏课程选择器与超长课程名折行/截断，确保 `scrollWidth <= innerWidth` 零横向溢出。
@@ -255,6 +259,6 @@ ALTER TABLE study_states
 
 ## 实施与验收记录
 
-迁移脚本按上节 SQL 执行。后台沿用串行分析；控制器先按课程校验资源归属，再读取状态、触发视频检索或执行写操作。通用规则位于 `m2/general.py`，由 `m2/agent.py` 按批次调用，数据库路径继续使用 `m2/concepts.py`。React 通过 `CurrentCourse` 提供课程上下文，`useCourseBase()` 生成路由，整个工作区以课 ID 为 key 重挂载。原有版本快照及其中的默认课出处链接可直接读取。
+迁移脚本按上节 SQL 执行。后台沿用串行分析并通过 `AnalysisApi` 与数据库 `FOR UPDATE` 行锁保护课程删除并发边界；`CourseApi` 提供列表、创建、自建课重命名（`PATCH`/`PUT`）与外键逆序级联删除（`DELETE`）及 Redis 版本缓存清理，默认课 `default` 前后端锁定。通用规则位于 `m2/general.py`，由 `m2/agent.py` 按批次调用，数据库路径继续使用 `m2/concepts.py`。前端通过 `CourseSwitcher.tsx` 实现右上角一体化胶囊浮层（捕获阶段 `Escape` 与外部点击关闭、极简列表、悬停/聚焦行内改名与二次确认删除），`App` 按课程与版本在内存中维护未提交上传草稿、复用勾选和待办笔记草稿，`<Workspace key={course.id}>` 结合 `CourseSummary.hasPublished` 稳定初始导入栏形态并隔离原文对照抽屉。
 
-空库迁移、旧库升级、两门课的完整学习流程、长课名双视口和真实 Java 重启均已实测。可复现步骤见[项目 README](../README.md)，测量条件与回归记录见[开发记录](development-notes.md)。
+空库迁移、旧库升级、M6-01～M6-09 全流程（含课程规则单元校验、双课隔离、跨课草稿恢复、自建课改名与级联删除、80 字符课名双视口防溢出、真实 Java 重启恢复）及 M2/M3/M5 回归均已实测通过。可复现步骤见[项目 README](../README.md)，测量条件与问题记录见[开发记录](development-notes.md)。

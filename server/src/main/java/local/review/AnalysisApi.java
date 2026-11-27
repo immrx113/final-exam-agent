@@ -50,6 +50,36 @@ class AnalysisApi {
   final ObjectMapper json;
   final String python, agent;
   final long timeout;
+  private final Map<String, Integer> activeAnalyses = new HashMap<>();
+  private final Set<String> deletingCourses = new HashSet<>();
+
+  void enterAnalysis(String courseId) {
+    synchronized (activeAnalyses) {
+      if (deletingCourses.contains(courseId))
+        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+      activeAnalyses.merge(courseId, 1, Integer::sum);
+    }
+  }
+
+  void exitAnalysis(String courseId) {
+    synchronized (activeAnalyses) {
+      activeAnalyses.computeIfPresent(courseId, (k, v) -> v > 1 ? v - 1 : null);
+    }
+  }
+
+  void beginCourseDelete(String courseId) {
+    synchronized (activeAnalyses) {
+      if (activeAnalyses.containsKey(courseId) || deletingCourses.contains(courseId))
+        throw new ResponseStatusException(HttpStatus.CONFLICT);
+      deletingCourses.add(courseId);
+    }
+  }
+
+  void endCourseDelete(String courseId) {
+    synchronized (activeAnalyses) {
+      deletingCourses.remove(courseId);
+    }
+  }
 
   AnalysisApi(CourseMapper courses,
       Catalog catalog,
@@ -96,31 +126,36 @@ class AnalysisApi {
   @PostMapping(value = "/jobs/{job}/analysis", headers = "X-Review-Request=1")
   synchronized Result analyze(@PathVariable(name="course", required=false) String course, @PathVariable UUID job) throws Exception {
     var owner = imports.ownedJob(course, job);
-    var items = catalog.items(job.toString());
-    if (items.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-    if (items.stream().noneMatch(i -> i.status().equals("ready"))
-        || items.stream().anyMatch(i -> !Set.of("ready", "failed").contains(i.status())))
-      throw new ResponseStatusException(HttpStatus.CONFLICT);
-    Map<String, Ref> refs = new LinkedHashMap<>();
-    List<Input> files = new ArrayList<>();
-    Set<String> papers = new HashSet<>();
-    for (var item : items) {
-      if (!item.status().equals("ready")) continue;
-      var file = catalog.file(item.file());
-      if (file.role().equals("exam") && !papers.add(file.digest())) continue;
-      var sources = imports.segments(course, job, item.file());
-      for (var s : sources)
-        refs.put(
-            s.id(), new Ref(file.id(), file.name(), file.role(), s.label(), s.url(), s.review()));
-      files.add(new Input(file.id(), file.role(), Parser.kind(file.name()), sources));
+    enterAnalysis(owner.id());
+    try {
+      var items = catalog.items(job.toString());
+      if (items.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+      if (items.stream().noneMatch(i -> i.status().equals("ready"))
+          || items.stream().anyMatch(i -> !Set.of("ready", "failed").contains(i.status())))
+        throw new ResponseStatusException(HttpStatus.CONFLICT);
+      Map<String, Ref> refs = new LinkedHashMap<>();
+      List<Input> files = new ArrayList<>();
+      Set<String> papers = new HashSet<>();
+      for (var item : items) {
+        if (!item.status().equals("ready")) continue;
+        var file = catalog.file(item.file());
+        if (file.role().equals("exam") && !papers.add(file.digest())) continue;
+        var sources = imports.segments(course, job, item.file());
+        for (var s : sources)
+          refs.put(
+              s.id(), new Ref(file.id(), file.name(), file.role(), s.label(), s.url(), s.review()));
+        files.add(new Input(file.id(), file.role(), Parser.kind(file.name()), sources));
+      }
+      String version = UUID.randomUUID().toString();
+      Output output = runAgent(owner, files, version);
+      validate(output, version, refs);
+      var passages = files.stream().filter(f -> !f.role().equals("exam"))
+          .flatMap(f -> f.segments().stream()).filter(s -> !s.review())
+          .map(s -> new StudyPlan.Passage(s.body(), s.id())).toList();
+      return tx.execute(status -> publish(owner, job.toString(), version, refs, output, passages));
+    } finally {
+      exitAnalysis(owner.id());
     }
-    String version = UUID.randomUUID().toString();
-    Output output = runAgent(owner, files, version);
-    validate(output, version, refs);
-    var passages = files.stream().filter(f -> !f.role().equals("exam"))
-        .flatMap(f -> f.segments().stream()).filter(s -> !s.review())
-        .map(s -> new StudyPlan.Passage(s.body(), s.id())).toList();
-    return tx.execute(status -> publish(owner, job.toString(), version, refs, output, passages));
   }
 
   private Output runAgent(CourseMapper.Course owner, List<Input> files, String batch) throws Exception {
