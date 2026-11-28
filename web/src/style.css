@@ -2178,3 +2178,12 @@ section[aria-label="B 站参考视频"] {
     width: min(332px, calc(100vw - 28px));
   }
 }
+.correction-tools { display: grid; gap: .7rem; margin: .8rem 0; overflow-wrap: anywhere; }
+.correction-tools select { max-width: 100%; }
+.correction-tools summary { cursor: pointer; }
+.correction-tools fieldset { min-width: 0; margin: .5rem 0; padding: .8rem; }
+.requirement { padding: .8rem 0; border-bottom: 1px solid #d1d8df; }
+.requirement p, .correction-preview p { margin: .4rem 0; }
+.topic-choices { display: flex; flex-wrap: wrap; gap: .4rem 1rem; margin: .5rem 0; }
+.topic-choices label { display: inline-flex; gap: .3rem; align-items: center; }
+.correction-preview { padding-top: .8rem; }

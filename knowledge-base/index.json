@@ -30,7 +30,7 @@
       "path": "knowledge-base/ROADMAP.md",
       "title": "期末复习助手 · 六项改造开发路线图",
       "status": "draft",
-      "status_reason": "用户已采纳六项改造并确定第二项选型；已同步 R1、R2 实测文档入口，其余阶段的顺序与详细验收为待核验规划。",
+      "status_reason": "用户已采纳六项改造并确定第二项选型；已同步 R1、R2、R3 实测文档入口，其余阶段的顺序与详细验收为待核验规划。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,
@@ -55,6 +55,16 @@
       "verified_on": "2026-11-28",
       "verification_scope": "R2-01 至 R2-06 的需求、本机单实例和双消费者故障场景、V5/V6 至 V7 升级、实际重投、浏览器课程隔离与旧入口兼容。",
       "verification_evidence": ["用户在收到 R2 需求、实施与验收草案后回复“开始开发R2”。", "r2-tests/tasks.mjs、recovery.mjs 和 TaskRulesTest 通过。真实停启 Broker、Redis、Java，并在发布后确认前退出消费者、在失去执行权后恢复旧消费者，核对任务状态、版本数、出处及笔记。", "M2 浏览器与同步故障、M3 学习导出、M5 UI 专项、M6 多课 prepare 和真实重启后 verify 均通过。"]
+    },
+    {
+      "path": "knowledge-base/r3-topic-corrections.md",
+      "title": "R3 考点校验与人工修正 · 需求与验收",
+      "status": "active",
+      "status_reason": "用户确认需求后已实现逐项核对与修正版发布，并完成本机独立试用库验证。",
+      "verification_state": "verified",
+      "verified_on": "2026-11-28",
+      "verification_scope": "R3-01 至 R3-06 的产品需求、自制样例计数、V7 升级、双页冲突、事务回滚、重启与版本导出，以及六题独立标注卷的对照评测。",
+      "verification_evidence": ["用户审阅需求与验收草案后明确回复“进行R3开发”。", "r3-tests/trial.mjs 在隔离数据库与 Edge 中验证复合题、两卷覆盖、幂等发布、回滚、课程隔离、旧版下载及重启，M2、M3、M5 专项及 M6 真实重启回归通过。", "r3-tests/test_requirements.py 和 holdout.py 核对默认课与通用课的逐项证据及不同配置下的自动结果；marked-paper.mjs 验证人工标注经发布后的结果。"]
     },
     {
       "path": "knowledge-base/multi-course-requirements.md",
@@ -129,7 +139,7 @@
       "path": "knowledge-base/development-notes.md",
       "title": "开发问题与性能优化记录",
       "status": "draft",
-      "status_reason": "持续积累开发记录。R1 条目保留 M6 与 R1 的三轮追加实测。R2 条目记录 RocketMQ 补投与确认、Redisson 任务锁、MySQL 发布保护、固定输入和部署问题，列出故障实测的执行次数与发布数。需求核验范围见各阶段登记。",
+      "status_reason": "持续积累开发记录。R1 记录追加解析实测，R2 记录消息重投与发布保护，R3 记录部分漏配、讲义定义漏收及修正发布的故障验证。核验范围见各阶段登记。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,

@@ -8,6 +8,7 @@ import {
 } from "react";
 import { EvidenceDrawer } from "./EvidenceDrawer";
 import { Study } from "./Study";
+import { Corrections } from "./Corrections";
 import { ExternalIcon, TopicCard, resolveFileId } from "./TopicCard";
 import type {
   ActiveEvidence,
@@ -23,6 +24,7 @@ const VIEW_ORDER: ViewMode[] = ["rank", "chapters", "plan", "study"];
 
 export type AnalysisProps = {
   snapshot: Snapshot | null;
+  onReadVersion: (snapshot: Snapshot) => void;
   hasJobs: boolean;
   initialLoading: boolean;
   selectedJob: string;
@@ -35,6 +37,7 @@ export type AnalysisProps = {
 
 export function Analysis({
   snapshot,
+  onReadVersion,
   hasJobs,
   initialLoading,
   selectedJob,
@@ -80,6 +83,11 @@ export function Analysis({
   });
 
   const version = snapshot?.version ?? "";
+  const [editTarget, setEditTarget] = useState<{version: string; question: number; requirement: number}>();
+  function editQuestion(file: string, label: string) {
+    const question = snapshot?.questions?.findIndex(q => q.file === file && q.label === label) ?? -1;
+    if (question >= 0) setEditTarget({version, question, requirement: 0});
+  }
 
   useEffect(() => {
     restoreFocusKeyRef.current = null;
@@ -326,6 +334,7 @@ export function Analysis({
         lastViewedKey={lastViewedKey}
         onOpenEvidence={handleOpenEvidence}
         onMarkViewed={handleMarkViewed}
+        onCorrect={snapshot.questions ? editQuestion : undefined}
       />
     );
   }
@@ -456,6 +465,9 @@ export function Analysis({
         )}
       </div>
 
+      <Corrections key={version} snapshot={snapshot} onRead={onReadVersion}
+        target={editTarget?.version === version ? editTarget : undefined}
+        evidence={(ref, key) => renderInlineEvidence(ref, key, "__correction", "考点核对", "作答要求原文")} />
       <div className="export-strip">
         {snapshot.paperCount > 0 && visible.length > 0 ? (
           <div className="export-bar">
@@ -586,6 +598,7 @@ export function Analysis({
                             activeKey={activeEvidence?.key ?? null}
                             lastViewedKey={lastViewedKey}
                             onOpenEvidence={handleOpenEvidence}
+                            onCorrect={snapshot.questions ? editQuestion : undefined}
                             onMarkViewed={handleMarkViewed}
                           />
                         </div>
@@ -662,6 +675,8 @@ export function Analysis({
                 {snapshot.reviews.map((r, i) => (
                   <li key={i} className="review-row">
                     <span className="review-reason">{r.reason}</span>
+                    {r.question != null && r.requirement != null && <button className="sub"
+                      onClick={() => setEditTarget({version, question: r.question!, requirement: r.requirement!})}>核对这一要求</button>}
                     <span className="review-refs">
                       {r.refs.map((refId) =>
                         renderInlineEvidence(

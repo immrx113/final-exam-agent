@@ -357,6 +357,12 @@ function Workspace({
 
       <Analysis
         snapshot={publishedSnapshot}
+        onReadVersion={(snap) => {
+          ++analysisGeneration.current;
+          setPublishedSnapshot(snap);
+          setAnalyzing(false);
+          setInitialLoading(false);
+        }}
         hasJobs={jobs.length > 0}
         initialLoading={initialLoading}
         selectedJob={selectedJob}

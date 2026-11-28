@@ -6,6 +6,7 @@ import os
 import re
 import sys
 import unicodedata
+from itertools import chain
 from pathlib import Path
 from concepts import (CORE, FOLLOW, KNOWN, MARKER, SKIP_LINE, normalize_clauses, PROSE, explanatory, noun,
                       teaching_definition, teaching_subject, term_name, term_patterns)
@@ -16,6 +17,31 @@ ASKED_CONCEPT = re.compile(r"^(?:请)?(?:什么是|解释|简述)([\w·-]{2,20}?
 CHAPTER = re.compile(r"^(?:#{1,2}\s+|第[零一二三四五六七八九十百\d]+章\s*)(.+)$")
 ALIASES = {"候选码": "候选键", "主码": "主键", "外码": "外键", "BC范式": "BCNF",
            "1NF": "第一范式", "2NF": "第二范式", "3NF": "第三范式", "4NF": "第四范式", "5NF": "第五范式"}
+
+# Split before a new instruction. A comma introducing the object of a question
+# (or a conjunction joining two concept names) belongs to the same instruction.
+ACTION = r"(?:请|指出|说明|解释|写出|给出|判断|简述|计算|求出|分析|比较|设计|证明|描述|根据上一问)"
+BREAK = re.compile(r"[；;]\s*|(?:[。！？?!]\s*|[，,\n]\s*(?:并且|并|再|然后)?\s*|(?:并且|并|然后|再))(?=" + ACTION + ")")
+BACKGROUND = re.compile(r"[^，。；,;]*(?:仅作背景|仅作示例)[^，。；,;]*|(?:无需|不涉及|不考查|不要求|不用|不考虑|背景知识|仅提到|仅提及|曾提到|曾提及)[^，。；,;]*")
+
+
+def instructions(parts):
+    text = ""
+    locations = []
+    for raw, source in parts:
+        if text:
+            text += "\n"
+        start = len(text)
+        text += raw
+        locations.append((start, len(text), source["id"]))
+    start = 0
+    boundaries = (m.span() for m in BREAK.finditer(text))
+    for end, following in chain(boundaries, [(len(text), len(text))]):
+        quote = text[start:end].strip()
+        if quote:
+            refs = list(dict.fromkeys(ref for lo, hi, ref in locations if lo < end and hi > start))
+            yield quote, refs
+        start = following
 
 
 def clean(text):
@@ -155,7 +181,8 @@ def analyze(batch):
         candidates = []
         parent = current = None
         section, term_section = "", False
-        for text, source in lines(file, normalize):
+        for raw, source in lines(file, lambda line: line):
+            text = normalize(raw)
             text = re.sub(r"^#{1,6}\s+", "", text)
             if generic and (header := general.SECTION.match(text)):
                 section = header[1]
@@ -185,7 +212,8 @@ def analyze(batch):
                     review("无法辨认题号", [source["id"]])
                 continue
             current["term_section"] = term_section
-            current["parts"].append((text, source))
+            raw_body = re.sub(r"^\s*(?:#+\s*)?(?:第\s*[0-9一二三四五六七八九十]+\s*题\s*[：:]?|\d+\s*[、.．]|[（(]\d+[）)])\s*", "", raw) if major or minor else raw
+            current["parts"].append((raw_body, source))
 
         # Dependent subparts share the parent's counting unit and its source locations.
         dependent = {id(q["parent"]) for q in candidates if "parent" in q and
@@ -203,7 +231,7 @@ def analyze(batch):
             parts = q["parts"]
             context = q.get("parent", {}).get("parts", []) + parts
             evidence = list(dict.fromkeys(s["id"] for _, s in context))
-            body = "".join(t for t, _ in parts)
+            body = normalize("".join(t for t, _ in parts))
             short_term = None
             if q.get("term_section"):
                 candidate = general.SCORE.sub("", body).strip(" 。?")
@@ -213,31 +241,52 @@ def analyze(batch):
                 review("题号重复或题干识别存疑", evidence)
                 continue
             seen_labels.add(q["label"])
-            task = re.sub(
-                r"(?:无需|不涉及|不考查|不要求|不用|不考虑|背景知识|仅作背景|仅作示例|"
-                r"仅提到|仅提及|曾提到|曾提及)[^，。；,;]*", "", body)
-            matches = list(dict.fromkeys(aliases.get(n, n) for n in exam_terms.findall(task))) if exam_terms else []
-            if short_term:
-                matches = [short_term]
-            if generic and not matches and (asked := general.ASKED.fullmatch(task)):
-                name = asked[1]
-                if general.valid(name) and general.SUFFIX.search(name):
-                    matches = [name]
-            if not generic and not matches and (asked := ASKED_CONCEPT.fullmatch(task)) and noun(asked[1]):
-                matches = [asked[1]]
-            for name in matches:
-                if name not in topics:
-                    topic(name, "待归类", "试题涉及" + name + "，教学资料中尚未找到定义。", [])
-                    exam_terms = term_patterns([*topics, *vocabulary])
-            question = {"file": file["id"], "label": q["label"], "refs": evidence, "matches": matches}
+            requirements = []
+            clauses = list(instructions(parts))
+            for quote, refs in clauses:
+                task = BACKGROUND.sub("", normalize(quote)).strip(" ,，;；。")
+                if not task and len(clauses) > 1:
+                    continue
+                matches = list(dict.fromkeys(aliases.get(n, n) for n in exam_terms.findall(task))) if exam_terms else []
+                if short_term:
+                    matches = [short_term]
+                if generic and not matches and (asked := general.ASKED.fullmatch(task)):
+                    name = asked[1]
+                    if general.valid(name) and general.SUFFIX.search(name):
+                        matches = [name]
+                if not generic and not matches and (asked := ASKED_CONCEPT.fullmatch(task)) and noun(asked[1]):
+                    matches = [asked[1]]
+                for name in matches:
+                    if name not in topics:
+                        topic(name, "待归类", "试题涉及" + name + "，教学资料中尚未找到定义。", [])
+                        exam_terms = term_patterns([*topics, *vocabulary])
+                requirement = dict(text=quote, refs=refs, matches=matches, candidates=[], pending=not matches,
+                                   reason="题干明确考查" if matches else "尚未确定该要求考查的知识点")
+                requirements.append(requirement)
+                if not matches and task:
+                    pending.append((requirement, task))
+                    if "外键" in topics and re.search(r"(编号|键值).*(?:必须|需要).*(?:表中|表里).*(?:存在|找到)", task):
+                        requirement["candidates"].append("外键")
+            if not requirements:
+                requirements.append(dict(text="".join(t for t, _ in parts), refs=evidence, matches=[], candidates=[],
+                                         pending=True, reason="未找到明确的作答要求"))
+            question = {"file": file["id"], "label": q["label"], "refs": evidence, "requirements": requirements}
             questions.append(question)
-            if not matches:
-                pending.append((question, task))
     semantic_matches(pending, topics, batch["batch"])
-    for question, _ in pending:
-        if not question["matches"]:
-            review("未能确定解题需要的知识点", question["refs"])
-    return {"batch": batch["batch"], "topics": list(topics.values()), "questions": questions, "reviews": reviews}
+    for qi, question in enumerate(questions):
+        requirements = question["requirements"]
+        explicit_hit = any(not req["pending"] for req in requirements)
+        for ri, req in enumerate(requirements):
+            if req["pending"] and req["matches"]:
+                if not explicit_hit:
+                    req.update(pending=False, reason="语义匹配", candidates=[])
+                else:
+                    req["candidates"] = list(dict.fromkeys(req["candidates"] + req["matches"]))
+                    req["matches"] = []
+            if req["pending"]:
+                reviews.append(dict(reason=req["reason"], refs=req["refs"], question=qi, requirement=ri))
+        question["matches"] = list(dict.fromkeys(name for r in requirements for name in r["matches"]))
+    return {"schema": 1, "batch": batch["batch"], "topics": list(topics.values()), "questions": questions, "reviews": reviews}
 
 
 if __name__ == "__main__":

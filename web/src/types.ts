@@ -94,7 +94,16 @@ export type PlanStep = {
 export type ReviewItem = {
   reason: string;
   refs: string[];
+  question?: number | null;
+  requirement?: number | null;
 };
+
+export type Requirement = {
+  text: string; refs: string[]; matches: string[]; candidates: string[];
+  reason: string; pending: boolean;
+};
+export type EditableQuestion = Question & { file: string; requirements: Requirement[] };
+export type Difference = { question: number; requirement: number; before: string[]; after: string[]; wasPending: boolean };
 
 export type Snapshot = {
   job: string;
@@ -104,6 +113,8 @@ export type Snapshot = {
   ranked: Topic[];
   sources: Record<string, SourceRef>;
   reviews: ReviewItem[];
+  questions?: EditableQuestion[] | null;
+  correction?: { parent: string; time: string; changes: Difference[] } | null;
 };
 
 export type StudyState = {

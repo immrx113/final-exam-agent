@@ -25,11 +25,15 @@ class AnalysisApi {
 
   record Topic(String name, String chapter, String text, List<String> refs) {}
 
-  record Question(String file, String label, List<String> refs, List<String> matches) {}
+  record Requirement(String text, List<String> refs, List<String> matches, List<String> candidates,
+                     boolean pending, String reason) {}
 
-  record Review(String reason, List<String> refs) {}
+  record Question(String file, String label, List<String> refs, List<String> matches,
+                  List<Requirement> requirements) {}
 
-  record Output(String batch, List<Topic> topics, List<Question> questions, List<Review> reviews) {}
+  record Review(String reason, List<String> refs, Integer question, Integer requirement) {}
+
+  record Output(String batch, List<Topic> topics, List<Question> questions, List<Review> reviews, Integer schema) {}
 
   record Ranked(
       String id, Topic topic, int outlineOrder, int count, int papers, List<Question> questions) {}
@@ -40,7 +44,7 @@ class AnalysisApi {
       int paperCount,
       List<Ranked> ranked,
       Map<String, Ref> sources,
-      List<Review> reviews, List<StudyPlan.Step> plan) {}
+      List<Review> reviews, List<StudyPlan.Step> plan, List<Question> questions, CorrectionApi.Audit correction) {}
 
   final Catalog catalog;
   final ImportApi imports;
@@ -211,15 +215,39 @@ class AnalysisApi {
                 && refs.get(id).file().equals(q.file())
                 && !refs.get(id).review());
       matched.addAll(q.matches());
+      if (Integer.valueOf(1).equals(out.schema())) {
+        require(q.requirements() != null && !q.requirements().isEmpty());
+        Set<String> union = new HashSet<>();
+        for (var r : q.requirements()) {
+          require(r != null && r.text() != null && !r.text().isBlank() && r.reason() != null
+              && r.refs() != null && !r.refs().isEmpty() && q.refs().containsAll(r.refs())
+              && r.matches() != null && r.candidates() != null && names.containsAll(r.matches())
+              && names.containsAll(r.candidates()) && (!r.pending() || r.matches().isEmpty()));
+          union.addAll(r.matches());
+        }
+        require(union.equals(new HashSet<>(q.matches())));
+      }
     }
     for (Topic t : out.topics()) require(!t.refs().isEmpty() || matched.contains(t.name()));
-    for (Review r : out.reviews())
+    Set<List<Integer>> pending = new HashSet<>();
+    for (Review r : out.reviews()) {
       require(
           r != null && r.reason() != null
               && !r.reason().isBlank()
               && r.refs() != null
               && !r.refs().isEmpty()
               && refs.keySet().containsAll(r.refs()));
+      if (r.question() != null || r.requirement() != null) {
+        require(Integer.valueOf(1).equals(out.schema()) && r.question() != null
+            && r.question() >= 0 && r.question() < out.questions().size());
+        var requirements = out.questions().get(r.question()).requirements();
+        require(r.requirement() != null && r.requirement() >= 0 && r.requirement() < requirements.size());
+        var target = requirements.get(r.requirement());
+        require(target.pending() && target.refs().equals(r.refs()) && pending.add(List.of(r.question(), r.requirement())));
+      }
+    }
+    if (Integer.valueOf(1).equals(out.schema()))
+      require(out.questions().stream().flatMap(q -> q.requirements().stream()).filter(Requirement::pending).count() == pending.size());
   }
 
   private static String topicId(String ns, String name) {
@@ -227,6 +255,11 @@ class AnalysisApi {
   }
 
   Result publish(CourseMapper.Course owner, String job, String version, String task, Prepared prepared) {
+    return publish(owner, job, version, task, prepared, null);
+  }
+
+  Result publish(CourseMapper.Course owner, String job, String version, String task, Prepared prepared,
+                 CorrectionApi.Audit correction) {
     var refs = prepared.refs();
     var out = prepared.output();
     var passages = prepared.passages();
@@ -237,9 +270,10 @@ class AnalysisApi {
     for (Question q : out.questions()) {
       papers.add(q.file());
       number++;
+      var brief = new Question(q.file(), q.label(), q.refs(), q.matches(), null);
       for (String name : q.matches()) {
         db.hit(version, topicId(owner.topicNs(), name), q.file(), number);
-        evidence.computeIfAbsent(name, unused -> new ArrayList<>()).add(q);
+        evidence.computeIfAbsent(name, unused -> new ArrayList<>()).add(brief);
       }
     }
     Map<String, AnalysisMapper.Counts> counts = new HashMap<>();
@@ -264,8 +298,11 @@ class AnalysisApi {
             .reversed()
             .thenComparing(Comparator.comparingInt(Ranked::papers).reversed())
             .thenComparingInt(r -> chapters.get(r.topic().chapter())));
-    Result result = new Result(version, job, papers.size(), ranked, refs, out.reviews(), StudyPlan.build(ranked, papers.size(), passages));
+    boolean editable = Integer.valueOf(1).equals(out.schema());
+    Result result = new Result(version, job, papers.size(), ranked, refs, out.reviews(),
+        StudyPlan.build(ranked, papers.size(), passages), editable ? out.questions() : null, correction);
     try {
+      if (editable) db.storePassages(version, json.writeValueAsString(passages));
       db.finish(version, json.writeValueAsString(result));
     } catch (IOException e) {
       throw new IllegalStateException(e);

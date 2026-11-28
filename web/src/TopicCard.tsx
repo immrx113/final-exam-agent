@@ -41,6 +41,7 @@ export type TopicCardProps = {
     trigger: HTMLButtonElement,
   ) => void;
   onMarkViewed: (key: string) => void;
+  onCorrect?: (file: string, label: string) => void;
 };
 
 export function TopicCard({
@@ -54,6 +55,7 @@ export function TopicCard({
   lastViewedKey,
   onOpenEvidence,
   onMarkViewed,
+  onCorrect,
 }: TopicCardProps) {
   const summaryStats = paperCount
     ? `${row.count} 题 · ${row.papers}/${paperCount} 份卷`
@@ -210,6 +212,7 @@ export function TopicCard({
                     }
                   >
                     <span className="question-label">第 {q.label} 题</span>
+                    {onCorrect && q.file && <button className="sub" onClick={() => onCorrect(q.file!, q.label)}>核对考点</button>}
                     <span className="question-refs">
                       {qRefs.map(({ refId, source }) =>
                         renderEvidenceActions(

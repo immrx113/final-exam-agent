@@ -1,6 +1,6 @@
 # 期末复习助手 · 六项改造开发路线图
 
-规划日期为 2026-11-27。六项改造已获用户采纳，需求二已选定 RocketMQ 和 Redisson。以下阶段顺序、接口草案和验收方法为建议，立项时六项均待开发。2026-11-28 已完成 R1 和 R2 的本机验收，实测范围分别见[R1 记录](r1-incremental-parsing.md)和[R2 记录](async-analysis-design.md)。每期交付一段能从学生工作台实际操作的流程。
+规划日期为 2026-11-27。六项改造已获用户采纳，需求二已选定 RocketMQ 和 Redisson。以下阶段顺序、接口草案和验收方法为建议，立项时六项均待开发。2026-11-28 已在本机验收前三项改造。实测范围见 [R1 增量解析](r1-incremental-parsing.md)、[R2 异步分析](async-analysis-design.md)和 [R3 考点修正](r3-topic-corrections.md)。每期交付一段能从学生工作台实际操作的流程。
 
 ## 六项改造
 

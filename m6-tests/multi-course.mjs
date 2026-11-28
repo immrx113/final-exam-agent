@@ -7,8 +7,8 @@ import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 
 const base = process.env.REVIEW_TEST_URL;
-if (!["http://127.0.0.1:18085", "http://127.0.0.1:18087", "http://127.0.0.1:18127"].includes(base)) {
-  throw Error("REVIEW_TEST_URL 须指向 18085、18087 或 18127 独立试用实例");
+if (!["http://127.0.0.1:18085", "http://127.0.0.1:18087", "http://127.0.0.1:18127", "http://127.0.0.1:18130"].includes(base)) {
+  throw Error("REVIEW_TEST_URL 须指向 18085、18087、18127 或 18130 独立试用实例");
 }
 const mode = process.argv[2];
 assert.ok(["prepare", "verify"].includes(mode), "使用 prepare 或 verify");
