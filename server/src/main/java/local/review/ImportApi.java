@@ -21,11 +21,13 @@ class ImportApi {
   static final Set<String> ROLES = Set.of("courseware", "material", "exam");
   final Catalog db;
   final Store store;
+  final ArtifactMapper artifacts;
 
-  ImportApi(CourseMapper courses, Catalog db, Store store) {
+  ImportApi(CourseMapper courses, Catalog db, Store store, ArtifactMapper artifacts) {
     this.courses = courses;
     this.db = db;
     this.store = store;
+    this.artifacts = artifacts;
   }
 
   private static ResponseStatusException invalid() {
@@ -160,9 +162,11 @@ class ImportApi {
   List<Source> segments(@PathVariable(name="course", required=false) String course, @PathVariable UUID job, @PathVariable String file) {
     var owner = ownedJob(course, job);
     var f = ownedFile(owner.id(), file);
-    if (f == null || db.preview(job.toString(), file) == null) throw missing();
+    String artifact = artifacts.current(job.toString(), file);
+    if (artifact == null && db.preview(job.toString(), file) == null) throw missing();
     String kind = Parser.kind(f.name());
-    return db.segments(job.toString(), file).stream()
+    var segments = artifact == null ? db.segments(job.toString(), file) : artifacts.segments(artifact);
+    return segments.stream()
         .map(
             s -> {
               String label =
@@ -173,6 +177,7 @@ class ImportApi {
                     default -> "原文第 " + s.pos() + " 页";
                   };
               String url = owner.base() + "/jobs/" + job + "/" + file + "/preview/" + s.pos();
+              if (artifact != null) url += "?artifact=" + artifact;
               if (kind.equals("line")) url += "#L" + s.pos();
               return new Source(file + "-" + s.pos(), s.pos(), s.body(), s.review(), label, url);
             })
@@ -185,10 +190,22 @@ class ImportApi {
       @PathVariable UUID job,
       @PathVariable String file,
       @PathVariable int pos,
+      @RequestParam(required=false) UUID artifact,
       HttpServletResponse res)
       throws Exception {
     var row = ownedFile(ownedJob(course, job).id(), file);
-    String prefix = db.preview(job.toString(), file);
+    String prefix;
+    if (artifact != null) {
+      if (!artifacts.wasBound(job.toString(), file, artifact.toString())) throw missing();
+      prefix = ArtifactStore.prefix(artifact.toString());
+    } else {
+      // Pre-upgrade evidence URLs always resolve to their original batch preview.
+      prefix = db.preview(job.toString(), file);
+      if (prefix == null) {
+        String current = artifacts.current(job.toString(), file);
+        if (current != null) prefix = ArtifactStore.prefix(current);
+      }
+    }
     if (prefix == null || pos < 1) throw missing();
     if (Parser.kind(row.name()).equals("image")) {
       if (pos != 1) throw missing();

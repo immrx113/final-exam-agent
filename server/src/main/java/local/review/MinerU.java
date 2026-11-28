@@ -28,16 +28,18 @@ final class MinerU {
     return connection;
   }
 
-  boolean available() {
+  String apiVersion() {
     try {
       var c = connect("/openapi.json", 3000);
       try (var in = c.getInputStream()) {
-        return JSON.readTree(in.readNBytes(1_000_000)).path("paths").has("/file_parse");
+        var api = JSON.readTree(in.readNBytes(1_000_000));
+        return api != null && api.path("paths").has("/file_parse")
+            ? api.path("info").path("version").asText("unspecified") : null;
       } finally {
         c.disconnect();
       }
     } catch (IOException e) {
-      return false;
+      return null;
     }
   }
 

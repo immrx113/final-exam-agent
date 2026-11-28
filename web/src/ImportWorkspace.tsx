@@ -446,6 +446,8 @@ export function ImportWorkspace({
                       <b className="file-name">{item.name}</b>
                       <span className={`status-pill status-${item.status}`}>
                         {ROLES[item.role]} · {ITEM_STATUS_LABELS[item.status]}
+                        {item.status === "ready" && item.parseOrigin &&
+                          (item.parseOrigin === "reused" ? " · 复用已有解析" : " · 本次解析")}
                       </span>
                     </div>
                     <div className="batch-file-actions">

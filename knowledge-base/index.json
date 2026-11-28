@@ -27,6 +27,16 @@
   },
   "documents": [
     {
+      "path": "knowledge-base/r1-incremental-parsing.md",
+      "title": "R1 增量解析 · 需求与验收",
+      "status": "active",
+      "status_reason": "用户确认需求后已实施，并完成独立试用库的增量解析、历史出处、迁移与故障恢复核验。",
+      "verification_state": "verified",
+      "verified_on": "2026-11-28",
+      "verification_scope": "R1-01 至 R1-06 需求及本机基础解析样本的浏览器、存储故障、重启、旧版链接和笔记迁移场景。MinerU 验证范围为接口契约。",
+      "verification_evidence": ["用户审阅 R1 需求与验收后回复“开始R1的开发吧”。", "V5 独立库创建真实旧批次、发布版本及笔记，升级 V6 并重启后核对原预览内容、批次与笔记。", "执行 r1-tests/incremental.mjs、recovery.mjs 和 restart.mjs 四个模式，使用真实 MySQL、MinIO、Redis、Edge，并核对解析器的逐文件执行计数。实测指标见 development-notes.md 的 R1 条目。"]
+    },
+    {
       "path": "knowledge-base/multi-course-requirements.md",
       "title": "多课程学习支持 · 需求与验收（M6）",
       "status": "active",
@@ -99,7 +109,7 @@
       "path": "knowledge-base/development-notes.md",
       "title": "开发问题与性能优化记录",
       "status": "draft",
-      "status_reason": "持续积累开发记录。M6 已实测的条件与结果见对应条目及 M6 需求、设计的核验登记，其他历史记录保留草稿状态。",
+      "status_reason": "持续积累开发记录。R1 条目补充 M6 原方案与 R1 同场景各三轮追加实测、计数方法及结果一致性核对，并保留新版全量对照与故障实测。需求核验范围见各阶段登记。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,

@@ -43,6 +43,7 @@ export type BatchItem = {
   role: Role;
   status: ItemStatus;
   reason: string | null;
+  parseOrigin?: "parsed" | "reused" | null;
 };
 
 export type SegmentSource = {

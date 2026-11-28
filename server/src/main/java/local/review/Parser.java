@@ -19,23 +19,51 @@ class Parser {
   private final String office;
   private final Path ocr;
   private MinerU layout;
+  private String layoutEndpoint;
+  @Value("${review.parser-revision:1}")
+  private String revision = "1";
+
+  static final class Run {
+    final String layoutVersion;
+    final boolean force;
+    int parses, conversions, rendered, ocrPages, layoutPages;
+    Run(String layoutVersion, boolean force) {
+      this.layoutVersion = layoutVersion;
+      this.force = force;
+    }
+  }
+
+  Run plan(String name, boolean force) {
+    boolean paged = Set.of("page", "rendered").contains(kind(name));
+    return new Run(paged && layout != null ? layout.apiVersion() : null, force);
+  }
+
+  String profile(String name, Run run) throws IOException {
+    String kind = kind(name);
+    var parts = new ArrayList<>(List.of("parser-v1", revision, kind));
+    if (!kind.equals("line")) {
+      parts.add(System.getProperty("os.version"));
+      if (run.layoutVersion != null) parts.add("mineru-pipeline-ch:" + layoutEndpoint + ":" + run.layoutVersion);
+      else {
+        parts.add("windows-ocr:" + ocr);
+        if (Files.isRegularFile(ocr)) parts.add(ArtifactStore.hash(ocr));
+      }
+      if (!kind.equals("image")) parts.add(org.apache.pdfbox.util.Version.getVersion());
+      if (kind.equals("rendered")) {
+        parts.add(office);
+        Path exe = Path.of(office);
+        if (Files.isRegularFile(exe)) parts.add(Files.getLastModifiedTime(exe).toString());
+        Path version = exe.resolveSibling("version.ini");
+        if (Files.isRegularFile(version)) parts.add(ArtifactStore.hash(version));
+      }
+    }
+    return String.join("\n", parts);
+  }
 
   @Value("${review.mineru-url:http://127.0.0.1:8000}")
   void configureLayout(String endpoint) {
+    layoutEndpoint = endpoint;
     layout = endpoint.isBlank() ? null : new MinerU(endpoint);
-  }
-
-  boolean layoutAvailable() {
-    return layout != null && layout.available();
-  }
-
-  List<Catalog.Segment> rereadLayout(Path input, Path dir, List<Catalog.Segment> previous)
-      throws Exception {
-    Path pdf = kind(input.toString()).equals("page") ? input : convertOffice(input, dir);
-    try (var document = Loader.loadPDF(pdf.toFile())) {
-      if (document.getNumberOfPages() != previous.size()) throw new IOException("预览页数已改变");
-    }
-    return readLayout(pdf, previous, true);
   }
 
   private List<Catalog.Segment> readLayout(Path pdf, List<Catalog.Segment> previous, boolean force)
@@ -70,11 +98,19 @@ class Parser {
   }
 
   List<Catalog.Segment> parse(Path input, Path dir) throws Exception {
+    return parse(input, dir, plan(input.toString(), false));
+  }
+
+  List<Catalog.Segment> parse(Path input, Path dir, Run run) throws Exception {
+    run.parses++;
     return switch (kind(input.toString())) {
       case "line" -> markdown(input, dir);
-      case "image" -> image(input, dir);
-      case "page" -> pdf(input, dir);
-      default -> pdf(convertOffice(input, dir), dir);
+      case "image" -> image(input, dir, run);
+      case "page" -> pdf(input, dir, run);
+      default -> {
+        run.conversions++;
+        yield pdf(convertOffice(input, dir), dir, run);
+      }
     };
   }
 
@@ -110,7 +146,7 @@ class Parser {
     return result;
   }
 
-  private List<Catalog.Segment> image(Path input, Path dir) throws Exception {
+  private List<Catalog.Segment> image(Path input, Path dir, Run run) throws Exception {
     try (var stream = ImageIO.createImageInputStream(input.toFile())) {
       var readers = ImageIO.getImageReaders(stream);
       if (!readers.hasNext()) throw new IOException("无效图片");
@@ -129,10 +165,11 @@ class Parser {
     if (decoded == null) throw new IOException("无效图片");
     Path image = dir.resolve("1.png");
     ImageIO.write(decoded, "png", image.toFile());
+    run.ocrPages++;
     return List.of(recognize(image, 1, dir));
   }
 
-  private List<Catalog.Segment> pdf(Path input, Path dir) throws Exception {
+  private List<Catalog.Segment> pdf(Path input, Path dir, Run run) throws Exception {
     var result = new ArrayList<Catalog.Segment>();
     try (var document = Loader.loadPDF(input.toFile())) {
       var renderer = new PDFRenderer(document);
@@ -146,21 +183,27 @@ class Parser {
         float dimension = Math.max(box.getWidth(), box.getHeight());
         float dpi = Math.min(144, 3000f * 72 / Math.max(1, dimension));
         ImageIO.write(renderer.renderImageWithDPI(page - 1, dpi), "png", image.toFile());
+        run.rendered++;
         result.add(new Catalog.Segment(page, text, false));
       }
     }
-    if (layoutAvailable())
-      return readLayout(input, result, result.stream().anyMatch(p -> PageText.suspect(p.body())));
-    return improve(result, dir);
+    if (run.layoutVersion != null) {
+      boolean forceOcr = run.force || result.stream().anyMatch(p -> PageText.suspect(p.body()));
+      run.layoutPages += result.size();
+      if (forceOcr) run.ocrPages += result.size();
+      return readLayout(input, result, forceOcr);
+    }
+    return improve(result, dir, run);
   }
 
-  List<Catalog.Segment> improve(List<Catalog.Segment> pages, Path dir) throws Exception {
+  private List<Catalog.Segment> improve(List<Catalog.Segment> pages, Path dir, Run run) throws Exception {
     var pending = pages.stream().filter(p -> PageText.suspect(p.body())).toList();
     if (pending.isEmpty()) return pages;
     Map<Integer, Catalog.Segment> replacements = new HashMap<>();
     Path manifest = dir.resolve("ocr-pages.txt");
     for (int start = 0; start < pending.size(); start += 16) {
       var batch = pending.subList(start, Math.min(start + 16, pending.size()));
+      run.ocrPages += batch.size();
       Files.write(
           manifest, batch.stream().map(p -> dir.resolve(p.pos() + ".png").toString()).toList());
       try {
@@ -176,11 +219,13 @@ class Parser {
             ocr.toString(),
             "-PageList",
             manifest.toString());
-      } catch (IOException ignored) {
+      } catch (IOException e) {
+        if (run.force) throw e;
         /* Keep readable source text and flag incomplete pages. */
       }
       for (var original : batch) {
         Path output = dir.resolve(original.pos() + ".png.txt");
+        if (run.force && !Files.isRegularFile(output)) throw new IOException("重新识别未返回页面");
         String read = Files.exists(output) ? PageText.fromOcr(Files.readString(output)) : "";
         boolean uncertain = PageText.suspect(read) || read.replaceAll("\\s", "").length() < 8;
         replacements.put(

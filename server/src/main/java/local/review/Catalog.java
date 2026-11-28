@@ -7,7 +7,7 @@ import org.apache.ibatis.annotations.*;
 interface Catalog {
   record FileRow(String id, String name, String role, String digest, String courseId) {}
 
-  record Item(String file, String name, String role, String status, String reason) {}
+  record Item(String file, String name, String role, String status, String reason, String parseOrigin) {}
 
   record Segment(int pos, String body, boolean review) {}
 
@@ -37,7 +37,7 @@ interface Catalog {
   void queue(String job, String file);
 
   @Select(
-      "SELECT i.file,f.name,f.role,i.status,i.reason FROM items i JOIN files f ON f.id=i.file WHERE"
+      "SELECT i.file,f.name,f.role,i.status,i.reason,i.parse_origin AS parseOrigin FROM items i JOIN files f ON f.id=i.file WHERE"
           + " job=#{job} ORDER BY f.name,i.file")
   List<Item> items(String job);
 
@@ -71,21 +71,8 @@ interface Catalog {
           + " status='rechecking'")
   void finishRecheck(String job, String file, String reason);
 
-  @Update(
-      "UPDATE segments SET body=#{s.body},review=#{s.review} WHERE job=#{job} AND file=#{file} AND"
-          + " pos=#{s.pos}")
-  void refreshSegment(String job, String file, Segment s);
-
-  @Insert(
-      "INSERT INTO segments(job,file,pos,body,review)"
-          + " VALUES(#{job},#{file},#{s.pos},#{s.body},#{s.review})")
-  void insertSegment(String job, String file, Segment s);
-
   @Select("SELECT pos,body,review FROM segments WHERE job=#{job} AND file=#{file} ORDER BY pos")
   List<Segment> segments(String job, String file);
-
-  @Update("UPDATE items SET status='ready',preview=#{prefix} WHERE job=#{job} AND file=#{file}")
-  void ready(String job, String file, String prefix);
 
   @Update("UPDATE items SET status='failed',reason=#{reason} WHERE job=#{job} AND file=#{file}")
   void fail(String job, String file, String reason);
