@@ -1,3 +1,4 @@
+import { waitForPublication } from "../r2-tests/publication.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
@@ -21,7 +22,7 @@ try {
   const analyze = page.getByRole("button", {name:"分析本批资料"});
   async function run() {
     const [response] = await Promise.all([
-      page.waitForResponse(r => r.request().method()==="POST" && r.url().endsWith("/analysis"), {timeout:150000}),
+      waitForPublication(page),
       analyze.click({timeout:90000})
     ]);
     assert.equal(response.status(),200,await response.text());

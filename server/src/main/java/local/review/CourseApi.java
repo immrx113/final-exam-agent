@@ -13,17 +13,17 @@ import org.springframework.web.server.ResponseStatusException;
 @RequestMapping("/api/courses")
 class CourseApi {
   private final CourseMapper courses;
-  private final AnalysisApi analysis;
+  private final TaskMapper tasks;
   private final TransactionTemplate tx;
   private final StringRedisTemplate cache;
 
   CourseApi(
       CourseMapper courses,
-      AnalysisApi analysis,
+      TaskMapper tasks,
       TransactionTemplate tx,
       StringRedisTemplate cache) {
     this.courses = courses;
-    this.analysis = analysis;
+    this.tasks = tasks;
     this.tx = tx;
     this.cache = cache;
   }
@@ -78,35 +78,30 @@ class CourseApi {
   @ResponseStatus(HttpStatus.NO_CONTENT)
   void delete(@PathVariable String id) {
     if ("default".equals(id)) throw new ResponseStatusException(HttpStatus.BAD_REQUEST);
-    analysis.beginCourseDelete(id);
-    try {
-      List<String> versions =
-          tx.execute(
-              status -> {
-                var row = courses.findForUpdate(id);
-                if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-                if (courses.hasActiveItems(id))
-                  throw new ResponseStatusException(HttpStatus.CONFLICT);
-                var list = courses.versions(id);
-                courses.deleteStudyStates(id);
-                courses.deleteAnalysisHits(id);
-                courses.deleteAnalysisVersions(id);
-                courses.deleteSegments(id);
-                courses.deleteItems(id);
-                courses.deleteJobs(id);
-                courses.deleteFiles(id);
-                courses.deleteCourse(id);
-                return list;
-              });
-      if (versions != null && !versions.isEmpty()) {
-        try {
-          cache.delete(versions.stream().map(v -> "review:m2:" + v).toList());
-        } catch (DataAccessException ignored) {
-          /* Best-effort cache eviction after DB commit. */
-        }
+    List<String> versions =
+        tx.execute(
+            status -> {
+              var row = courses.findForUpdate(id);
+              if (row == null) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+              if (courses.hasActiveItems(id) || tasks.active(id) != null)
+                throw new ResponseStatusException(HttpStatus.CONFLICT);
+              var list = courses.versions(id);
+              courses.deleteStudyStates(id);
+              courses.deleteAnalysisHits(id);
+              courses.deleteAnalysisVersions(id);
+              courses.deleteSegments(id);
+              courses.deleteItems(id);
+              courses.deleteJobs(id);
+              courses.deleteFiles(id);
+              courses.deleteCourse(id);
+              return list;
+            });
+    if (versions != null && !versions.isEmpty()) {
+      try {
+        cache.delete(versions.stream().map(v -> "review:m2:" + v).toList());
+      } catch (DataAccessException ignored) {
+        /* Best-effort cache eviction after DB commit. */
       }
-    } finally {
-      analysis.endCourseDelete(id);
     }
   }
 }

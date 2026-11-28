@@ -4,6 +4,7 @@ import "./style.css";
 import { Analysis } from "./Analysis";
 import { CourseSwitcher } from "./CourseSwitcher";
 import { ImportWorkspace } from "./ImportWorkspace";
+import { useAnalysisTask } from "./useAnalysisTask";
 import { Videos } from "./Videos";
 import {
   courseApi,
@@ -16,7 +17,7 @@ import {
   deleteCourse,
   errorMessage,
   fetchPublishedAnalysis,
-  runBatchAnalysis,
+
 } from "./api";
 import {
   formatBatchLabel,
@@ -250,27 +251,14 @@ function Workspace({
     }
   }
 
-  async function handleAnalyzeBatch() {
-    if (!selectedJob) return;
-    const token = ++analysisGeneration.current;
-    setAnalyzing(true);
+  const analysisTask = useAnalysisTask(base, selectedJob, (snap) => {
+    ++analysisGeneration.current;
+    setPublishedSnapshot(snap);
+    setInitialLoading(false);
+    setAnalyzing(false);
     setAnalysisError("");
-    try {
-      const snap = await runBatchAnalysis(base, selectedJob);
-      if (token === analysisGeneration.current) {
-        setPublishedSnapshot(snap);
-        onCoursePublishedChange(true);
-      }
-    } catch (e) {
-      if (token === analysisGeneration.current) {
-        setAnalysisError(errorMessage(e, "读取失败"));
-      }
-    } finally {
-      if (token === analysisGeneration.current) {
-        setAnalyzing(false);
-      }
-    }
-  }
+    onCoursePublishedChange(true);
+  });
 
   async function handleLoadLatestAnalysis() {
     const token = ++analysisGeneration.current;
@@ -331,8 +319,10 @@ function Workspace({
         submitting={submitting}
         importError={importError}
         pollError={pollError}
-        analyzing={analyzing}
-        analysisError={analysisError}
+        analyzing={analyzing || analysisTask.busy}
+        analyzeLabel={analysisTask.unconfirmed ? "重试提交" : analysisTask.task?.job === selectedJob ? "重新分析本批资料" : "分析本批资料"}
+        taskStatus={analysisTask.task && `${formatBatchLabel(jobs, analysisTask.task.job)} · ${analysisTask.label} · 任务 ${analysisTask.task.id}${analysisTask.task.reason ? " · " + analysisTask.task.reason : ""}`}
+        analysisError={analysisTask.error || analysisError}
         canAnalyze={canAnalyze}
         onAddDrafts={(role: Role, files: File[]) =>
           onUpdateDraft((prev) => [
@@ -361,7 +351,7 @@ function Workspace({
         onReloadCourse={() => setReloadTick((v) => v + 1)}
         onSelectJob={selectJob}
         onRetryFile={(fileId, action) => void handleRetryFile(fileId, action)}
-        onAnalyze={() => void handleAnalyzeBatch()}
+        onAnalyze={() => void analysisTask.submit()}
         onLoadLatestAnalysis={() => void handleLoadLatestAnalysis()}
       />
 

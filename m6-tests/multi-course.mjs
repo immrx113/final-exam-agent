@@ -1,3 +1,4 @@
+import { waitForPublication } from "../r2-tests/publication.mjs";
 // Prepare, restart the dedicated Java service, then verify against its saved versions.
 import assert from "node:assert/strict";
 import { createServer } from "node:http";
@@ -6,8 +7,8 @@ import { createRequire } from "node:module";
 import { createHash } from "node:crypto";
 
 const base = process.env.REVIEW_TEST_URL;
-if (!["http://127.0.0.1:18085", "http://127.0.0.1:18087"].includes(base)) {
-  throw Error("REVIEW_TEST_URL 须指向 18085 或 18087 独立试用实例");
+if (!["http://127.0.0.1:18085", "http://127.0.0.1:18087", "http://127.0.0.1:18127"].includes(base)) {
+  throw Error("REVIEW_TEST_URL 须指向 18085、18087 或 18127 独立试用实例");
 }
 const mode = process.argv[2];
 assert.ok(["prepare", "verify"].includes(mode), "使用 prepare 或 verify");
@@ -67,7 +68,7 @@ async function publish(prefix, lesson, exam, stamp) {
   assert.equal(response.status(), 200);
   const { id } = await response.json();
   await page.waitForFunction(job => document.querySelector('[aria-label="处理批次"]')?.value === job, id);
-  const published = page.waitForResponse(r => r.url() === base + prefix + "/jobs/" + id + "/analysis");
+  const published = waitForPublication(page);
   await page.getByRole("button", { name: "分析本批资料" }).click();
   const analysis = await published;
   assert.equal(analysis.status(), 200);

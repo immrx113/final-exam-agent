@@ -79,6 +79,8 @@ export type ImportWorkspaceProps = {
   importError: string;
   pollError: string;
   analyzing: boolean;
+  analyzeLabel: string;
+  taskStatus?: string;
   analysisError: string;
   canAnalyze: boolean;
   onAddDrafts: (role: Role, files: File[]) => void;
@@ -106,6 +108,8 @@ export function ImportWorkspace({
   importError,
   pollError,
   analyzing,
+  analyzeLabel,
+  taskStatus,
   analysisError,
   canAnalyze,
   onAddDrafts,
@@ -406,10 +410,12 @@ export function ImportWorkspace({
                 disabled={!canAnalyze || analyzing}
                 onClick={onAnalyze}
               >
-                {analyzing ? "正在读取或分析…" : "分析本批资料"}
+                {analyzing ? "正在读取或分析…" : analyzeLabel}
               </button>
             </div>
           </div>
+
+          {taskStatus && <p role="status" className="hint">{taskStatus}</p>}
 
           {hasPublished && !isSelectedPublished && publishedBatchLabel && (
             <p className="batch-preserve-note">

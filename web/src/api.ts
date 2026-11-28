@@ -104,23 +104,6 @@ export async function fetchPublishedAnalysis(base: string): Promise<Snapshot | n
   return (await response.json()) as Snapshot | null;
 }
 
-export async function runBatchAnalysis(base: string, jobId: string): Promise<Snapshot> {
-  const response = await fetch(`${base}/jobs/${jobId}/analysis`, {
-    method: "POST",
-    headers: { "X-Review-Request": "1" },
-  });
-  if (!response.ok) {
-    throw new Error(
-      response.status === 504
-        ? "分析超时，请重试"
-        : response.status === 502
-          ? "分析失败，请检查 Python 环境并重试"
-          : "课程分析暂不可用，请重试",
-    );
-  }
-  return (await response.json()) as Snapshot;
-}
-
 export function errorMessage(error: unknown, fallback = "连接失败，请重试"): string {
   return error instanceof Error ? error.message : fallback;
 }

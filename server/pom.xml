@@ -4,6 +4,8 @@
   <groupId>local.review</groupId><artifactId>review-import</artifactId><version>1.0.0</version>
   <properties><java.version>21</java.version></properties>
   <dependencies>
+    <dependency><groupId>org.apache.rocketmq</groupId><artifactId>rocketmq-client</artifactId><version>5.3.2</version></dependency>
+    <dependency><groupId>org.redisson</groupId><artifactId>redisson</artifactId><version>3.45.1</version></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-data-redis</artifactId></dependency>
     <dependency><groupId>org.springframework.boot</groupId><artifactId>spring-boot-starter-web</artifactId></dependency>
     <dependency><groupId>org.mybatis.spring.boot</groupId><artifactId>mybatis-spring-boot-starter</artifactId><version>3.0.4</version></dependency>

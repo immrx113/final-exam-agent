@@ -1,3 +1,4 @@
+import { waitForPublication } from "../r2-tests/publication.mjs";
 import assert from "node:assert/strict";
 import {createServer} from "node:http";
 import {createRequire} from "node:module";
@@ -41,7 +42,7 @@ try {
     const [job]=await Promise.all([page.waitForResponse(r=>r.url().endsWith("/jobs") && r.request().method()==="POST"),page.getByRole("button",{name:"提交处理"}).click()]);
     const id=(await job.json()).id;
     await page.waitForFunction(id=>document.querySelector('[aria-label="处理批次"]')?.value===id,id);
-    const [analysis]=await Promise.all([page.waitForResponse(r=>r.url().endsWith("/jobs/"+id+"/analysis")),page.getByRole("button",{name:"分析本批资料"}).click()]);
+    const [analysis]=await Promise.all([waitForPublication(page),page.getByRole("button",{name:"分析本批资料"}).click()]);
     assert.equal(analysis.status(),200);
     return (await analysis.json()).version;
   }

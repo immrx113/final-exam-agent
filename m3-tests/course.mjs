@@ -1,3 +1,4 @@
+import { waitForPublication } from "../r2-tests/publication.mjs";
 import assert from "node:assert/strict";
 import {readFile} from "node:fs/promises";
 import {createRequire} from "node:module";
@@ -10,6 +11,13 @@ try {
   const page = await browser.newPage();
   const errors = [];
   page.on("pageerror", e => errors.push(e.message));
+  // Model the initial unpublished state consistently across both read endpoints.
+  let firstSubmission = false;
+  await page.route("**/jobs/*/analysis-tasks", route => {
+    if (route.request().method() === "POST") firstSubmission = true;
+    if (firstSubmission) return route.continue();
+    return route.fulfill({ status: 204 });
+  });
   await page.route("**/api/course/analysis",route=>route.fulfill({body:"null",contentType:"application/json"}),{times:1});
   await page.goto(base);
   if ((await (await page.request.get(base+"/api/course/jobs")).json()).length)
@@ -30,7 +38,7 @@ try {
     const {id} = await jobResponse.json();
     await page.waitForFunction(id => document.querySelector('[aria-label="处理批次"]')?.value===id,id);
     const [response] = await Promise.all([
-      page.waitForResponse(r=>r.url().endsWith("/jobs/"+id+"/analysis") && r.request().method()==="POST"),
+      waitForPublication(page),
       page.getByRole("button",{name:"分析本批资料"}).click()
     ]);
     assert.equal(response.status(),200,await response.text());

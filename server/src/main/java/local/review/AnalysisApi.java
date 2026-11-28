@@ -21,7 +21,7 @@ class AnalysisApi {
   private final CourseMapper courses;
   record Ref(String file, String name, String role, String label, String url, boolean review) {}
 
-  record Input(String id, String role, String kind, List<ImportApi.Source> segments) {}
+  record Input(String id, String name, String role, String kind, List<ImportApi.Source> segments) {}
 
   record Topic(String name, String chapter, String text, List<String> refs) {}
 
@@ -50,37 +50,7 @@ class AnalysisApi {
   final ObjectMapper json;
   final String python, agent;
   final long timeout;
-  private final Map<String, Integer> activeAnalyses = new HashMap<>();
-  private final Set<String> deletingCourses = new HashSet<>();
-
-  void enterAnalysis(String courseId) {
-    synchronized (activeAnalyses) {
-      if (deletingCourses.contains(courseId))
-        throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-      activeAnalyses.merge(courseId, 1, Integer::sum);
-    }
-  }
-
-  void exitAnalysis(String courseId) {
-    synchronized (activeAnalyses) {
-      activeAnalyses.computeIfPresent(courseId, (k, v) -> v > 1 ? v - 1 : null);
-    }
-  }
-
-  void beginCourseDelete(String courseId) {
-    synchronized (activeAnalyses) {
-      if (activeAnalyses.containsKey(courseId) || deletingCourses.contains(courseId))
-        throw new ResponseStatusException(HttpStatus.CONFLICT);
-      deletingCourses.add(courseId);
-    }
-  }
-
-  void endCourseDelete(String courseId) {
-    synchronized (activeAnalyses) {
-      deletingCourses.remove(courseId);
-    }
-  }
-
+  final String workerTopic;
   AnalysisApi(CourseMapper courses,
       Catalog catalog,
       ImportApi imports,
@@ -90,7 +60,8 @@ class AnalysisApi {
       ObjectMapper json,
       @Value("${review.python}") String python,
       @Value("${review.agent}") String agent,
-      @Value("${review.agent-timeout-seconds}") long timeout) {
+      @Value("${review.agent-timeout-seconds}") long timeout,
+      @Value("${review.analysis-topic:ReviewAnalysis}") String workerTopic) {
     this.courses = courses;
     this.catalog = catalog;
     this.imports = imports;
@@ -101,6 +72,9 @@ class AnalysisApi {
     this.python = python;
     this.agent = agent;
     this.timeout = timeout;
+    if (!workerTopic.matches("[A-Za-z][A-Za-z0-9_]{0,63}"))
+      throw new IllegalArgumentException("无效分析主题名");
+    this.workerTopic = workerTopic;
   }
 
   @GetMapping(value = "/analysis", produces = MediaType.APPLICATION_JSON_VALUE)
@@ -123,39 +97,49 @@ class AnalysisApi {
     return result;
   }
 
-  @PostMapping(value = "/jobs/{job}/analysis", headers = "X-Review-Request=1")
-  synchronized Result analyze(@PathVariable(name="course", required=false) String course, @PathVariable UUID job) throws Exception {
-    var owner = imports.ownedJob(course, job);
-    enterAnalysis(owner.id());
-    try {
-      var items = catalog.items(job.toString());
-      if (items.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
-      if (items.stream().noneMatch(i -> i.status().equals("ready"))
-          || items.stream().anyMatch(i -> !Set.of("ready", "failed").contains(i.status())))
-        throw new ResponseStatusException(HttpStatus.CONFLICT);
-      Map<String, Ref> refs = new LinkedHashMap<>();
-      List<Input> files = new ArrayList<>();
-      Set<String> papers = new HashSet<>();
-      for (var item : items) {
-        if (!item.status().equals("ready")) continue;
-        var file = catalog.file(item.file());
-        if (file.role().equals("exam") && !papers.add(file.digest())) continue;
-        var sources = imports.segments(course, job, item.file());
-        for (var s : sources)
-          refs.put(
-              s.id(), new Ref(file.id(), file.name(), file.role(), s.label(), s.url(), s.review()));
-        files.add(new Input(file.id(), file.role(), Parser.kind(file.name()), sources));
-      }
-      String version = UUID.randomUUID().toString();
-      Output output = runAgent(owner, files, version);
-      validate(output, version, refs);
-      var passages = files.stream().filter(f -> !f.role().equals("exam"))
-          .flatMap(f -> f.segments().stream()).filter(s -> !s.review())
-          .map(s -> new StudyPlan.Passage(s.body(), s.id())).toList();
-      return tx.execute(status -> publish(owner, job.toString(), version, refs, output, passages));
-    } finally {
-      exitAnalysis(owner.id());
+  record FrozenFile(String id, String name, String role, String kind, String artifact,
+                    List<ImportApi.Source> segments) {}
+  record Frozen(CourseMapper.Course owner, List<FrozenFile> files, String workerTopic) {}
+
+  Frozen freeze(CourseMapper.Course owner, UUID job) {
+    var items = catalog.items(job.toString());
+    if (items.isEmpty()) throw new ResponseStatusException(HttpStatus.NOT_FOUND);
+    if (items.stream().noneMatch(i -> i.status().equals("ready"))
+        || items.stream().anyMatch(i -> !Set.of("ready", "failed").contains(i.status())))
+      throw new ResponseStatusException(HttpStatus.CONFLICT);
+    List<FrozenFile> files = new ArrayList<>();
+    Set<String> papers = new HashSet<>();
+    for (var item : items) {
+      if (!item.status().equals("ready")) continue;
+      var file = catalog.file(item.file());
+      if (file.role().equals("exam") && !papers.add(file.digest())) continue;
+      String kind = Parser.kind(file.name());
+      String artifact = imports.currentArtifact(job.toString(), file.id());
+      var legacy = artifact == null ? imports.readSources(owner, job.toString(), file.id(), kind, null) : null;
+      files.add(new FrozenFile(file.id(), file.name(), file.role(), kind, artifact, legacy));
     }
+    return new Frozen(owner, files, workerTopic);
+  }
+
+  record Prepared(Map<String, Ref> refs, Output output, List<StudyPlan.Passage> passages) {}
+
+  Prepared compute(Frozen input, String job, String version) throws Exception {
+    List<Input> files = new ArrayList<>();
+    Map<String, Ref> refs = new LinkedHashMap<>();
+    for (var file : input.files()) {
+      var sources = file.artifact() == null ? file.segments()
+          : imports.readSources(input.owner(), job, file.id(), file.kind(), file.artifact());
+      files.add(new Input(file.id(), file.name(), file.role(), file.kind(), sources));
+      for (var s : sources) {
+        refs.put(s.id(), new Ref(file.id(), file.name(), file.role(), s.label(), s.url(), s.review()));
+      }
+    }
+    Output output = runAgent(input.owner(), files, version);
+    validate(output, version, refs);
+    var passages = files.stream().filter(f -> !f.role().equals("exam"))
+        .flatMap(f -> f.segments().stream()).filter(s -> !s.review())
+        .map(s -> new StudyPlan.Passage(s.body(), s.id())).toList();
+    return new Prepared(refs, output, passages);
   }
 
   private Output runAgent(CourseMapper.Course owner, List<Input> files, String batch) throws Exception {
@@ -173,6 +157,8 @@ class AnalysisApi {
         throw new ResponseStatusException(HttpStatus.GATEWAY_TIMEOUT);
       if (process.exitValue() != 0) throw new IOException("Agent failed");
       return json.readValue(output.toFile(), Output.class);
+    } catch (com.fasterxml.jackson.core.JsonProcessingException e) {
+      throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "分析结果校验失败", e);
     } catch (IOException e) {
       throw new ResponseStatusException(HttpStatus.BAD_GATEWAY, "分析进程不可用", e);
     } finally {
@@ -197,7 +183,7 @@ class AnalysisApi {
     Set<String> names = new HashSet<>(), labels = new HashSet<>(), matched = new HashSet<>();
     for (Topic t : out.topics()) {
       require(
-          t.name() != null
+          t != null && t.name() != null
               && !t.name().isBlank()
               && names.add(t.name())
               && t.chapter() != null
@@ -210,7 +196,7 @@ class AnalysisApi {
     }
     for (Question q : out.questions()) {
       require(
-          q.label() != null
+          q != null && q.label() != null
               && !q.label().isBlank()
               && labels.add(q.file() + "/" + q.label())
               && q.refs() != null
@@ -229,7 +215,7 @@ class AnalysisApi {
     for (Topic t : out.topics()) require(!t.refs().isEmpty() || matched.contains(t.name()));
     for (Review r : out.reviews())
       require(
-          r.reason() != null
+          r != null && r.reason() != null
               && !r.reason().isBlank()
               && r.refs() != null
               && !r.refs().isEmpty()
@@ -240,8 +226,11 @@ class AnalysisApi {
     return UUID.nameUUIDFromBytes((ns + "/" + name).getBytes(StandardCharsets.UTF_8)).toString();
   }
 
-  private Result publish(CourseMapper.Course owner, String job, String version, Map<String, Ref> refs, Output out, List<StudyPlan.Passage> passages) {
-    db.begin(owner.id(), version, job);
+  Result publish(CourseMapper.Course owner, String job, String version, String task, Prepared prepared) {
+    var refs = prepared.refs();
+    var out = prepared.output();
+    var passages = prepared.passages();
+    db.begin(owner.id(), version, job, task);
     Map<String, List<Question>> evidence = new HashMap<>();
     Set<String> papers = new HashSet<>();
     int number = 0;

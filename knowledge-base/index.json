@@ -27,6 +27,16 @@
   },
   "documents": [
     {
+      "path": "knowledge-base/ROADMAP.md",
+      "title": "期末复习助手 · 六项改造开发路线图",
+      "status": "draft",
+      "status_reason": "用户已采纳六项改造并确定第二项选型；已同步 R1、R2 实测文档入口，其余阶段的顺序与详细验收为待核验规划。",
+      "verification_state": "unverified",
+      "verified_on": null,
+      "verification_scope": null,
+      "verification_evidence": []
+    },
+    {
       "path": "knowledge-base/r1-incremental-parsing.md",
       "title": "R1 增量解析 · 需求与验收",
       "status": "active",
@@ -35,6 +45,16 @@
       "verified_on": "2026-11-28",
       "verification_scope": "R1-01 至 R1-06 需求及本机基础解析样本的浏览器、存储故障、重启、旧版链接和笔记迁移场景。MinerU 验证范围为接口契约。",
       "verification_evidence": ["用户审阅 R1 需求与验收后回复“开始R1的开发吧”。", "V5 独立库创建真实旧批次、发布版本及笔记，升级 V6 并重启后核对原预览内容、批次与笔记。", "执行 r1-tests/incremental.mjs、recovery.mjs 和 restart.mjs 四个模式，使用真实 MySQL、MinIO、Redis、Edge，并核对解析器的逐文件执行计数。实测指标见 development-notes.md 的 R1 条目。"]
+    },
+    {
+      "path": "knowledge-base/async-analysis-design.md",
+      "title": "R2 异步分析与安全重试 · 需求、实施与验收",
+      "status": "active",
+      "status_reason": "用户确认 R2 后已完成实现与本机独立试用库验收。",
+      "verification_state": "verified",
+      "verified_on": "2026-11-28",
+      "verification_scope": "R2-01 至 R2-06 的需求、本机单实例和双消费者故障场景、V5/V6 至 V7 升级、实际重投、浏览器课程隔离与旧入口兼容。",
+      "verification_evidence": ["用户在收到 R2 需求、实施与验收草案后回复“开始开发R2”。", "r2-tests/tasks.mjs、recovery.mjs 和 TaskRulesTest 通过。真实停启 Broker、Redis、Java，并在发布后确认前退出消费者、在失去执行权后恢复旧消费者，核对任务状态、版本数、出处及笔记。", "M2 浏览器与同步故障、M3 学习导出、M5 UI 专项、M6 多课 prepare 和真实重启后 verify 均通过。"]
     },
     {
       "path": "knowledge-base/multi-course-requirements.md",
@@ -109,7 +129,7 @@
       "path": "knowledge-base/development-notes.md",
       "title": "开发问题与性能优化记录",
       "status": "draft",
-      "status_reason": "持续积累开发记录。R1 条目补充 M6 原方案与 R1 同场景各三轮追加实测、计数方法及结果一致性核对，并保留新版全量对照与故障实测。需求核验范围见各阶段登记。",
+      "status_reason": "持续积累开发记录。R1 条目保留 M6 与 R1 的三轮追加实测。R2 条目记录 RocketMQ 补投与确认、Redisson 任务锁、MySQL 发布保护、固定输入和部署问题，列出故障实测的执行次数与发布数。需求核验范围见各阶段登记。",
       "verification_state": "unverified",
       "verified_on": null,
       "verification_scope": null,

@@ -1,3 +1,4 @@
+import { waitForPublication } from "../r2-tests/publication.mjs";
 import assert from "node:assert/strict";
 import { createRequire } from "node:module";
 import { readFile } from "node:fs/promises";
@@ -30,12 +31,12 @@ try {
     const {id} = await batch.json();
     await page.waitForFunction(id => document.querySelector('[aria-label="处理批次"]')?.value === id, id);
     const button = page.getByRole("button", {name:"分析本批资料"});
-    await page.waitForFunction(() => [...document.querySelectorAll("button")].some(b => b.textContent==="分析本批资料" && !b.disabled), null, {timeout:240000});
+    await page.waitForFunction(() => [...document.querySelectorAll("button")].some(b => b.textContent.endsWith("分析本批资料") && !b.disabled), null, {timeout:240000});
     const parsed = performance.now();
     const items = await (await page.request.get(base+"/api/course/jobs/"+id)).json();
     assert.ok(items.every(i => i.status === "ready"), JSON.stringify(items.map(i=>[i.name,i.status])));
     const [response] = await Promise.all([
-      page.waitForResponse(r => r.url().endsWith("/jobs/"+id+"/analysis"), {timeout:150000}),
+      waitForPublication(page),
       button.click(),
     ]);
     assert.equal(response.status(), 200);

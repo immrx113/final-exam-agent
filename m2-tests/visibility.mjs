@@ -10,6 +10,7 @@ try {
   await page.route("**/api/course/files", route => route.fulfill({ json: [] }));
   await page.route("**/api/course/jobs", route => route.fulfill({ json: [job] }));
   await page.route("**/api/course/jobs/example", route => route.fulfill({ json: [] }));
+  await page.route("**/jobs/example/analysis-tasks", route => route.fulfill({status:204}));
   const rows = ["主键", "视图"].map((name, i) => ({
     id: String(i), topic: { name, chapter: "章节" + i, text: name, refs: [] },
     count: 1-i, papers: 1-i, questions: [],

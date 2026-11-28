@@ -3,7 +3,7 @@ $ErrorActionPreference = 'Stop'
 $PSNativeCommandUseErrorActionPreference = $true
 Push-Location $PSScriptRoot
 $savedEnv = @{}
-foreach ($name in 'REVIEW_DB_PASSWORD','REVIEW_DB_ROOT_PASSWORD','REVIEW_OBJECT_USER','REVIEW_OBJECT_PASSWORD','REVIEW_MYSQL_PORT','REVIEW_MINIO_PORT','REVIEW_REDIS_PORT','REVIEW_PYTHON','REVIEW_SEMANTIC','REVIEW_OFFICE','REVIEW_AGENT','REVIEW_OCR','MINERU_MODEL_SOURCE','MODELSCOPE_CACHE','MINERU_API_MAX_CONCURRENT_REQUESTS') {
+foreach ($name in 'REVIEW_DB_PASSWORD','REVIEW_DB_ROOT_PASSWORD','REVIEW_OBJECT_USER','REVIEW_OBJECT_PASSWORD','REVIEW_MYSQL_PORT','REVIEW_MINIO_PORT','REVIEW_REDIS_PORT','REVIEW_MQ_PORT','REVIEW_BROKER_PORT','REVIEW_PYTHON','REVIEW_SEMANTIC','REVIEW_OFFICE','REVIEW_AGENT','REVIEW_OCR','MINERU_MODEL_SOURCE','MODELSCOPE_CACHE','MINERU_API_MAX_CONCURRENT_REQUESTS') {
     $savedEnv[$name] = [Environment]::GetEnvironmentVariable($name)
 }
 try {
@@ -18,6 +18,8 @@ try {
         $env:REVIEW_MYSQL_PORT = '33315'
         $env:REVIEW_MINIO_PORT = '39015'
         $env:REVIEW_REDIS_PORT = '36385'
+        $env:REVIEW_MQ_PORT = '39885'
+        $env:REVIEW_BROKER_PORT = '30985'
         $serverArgs = @("--server.port=$port")
     }
     if ($BasicParsing) { $serverArgs += '--review.mineru-url=' }

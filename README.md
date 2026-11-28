@@ -24,7 +24,7 @@ $env:REVIEW_SEMANTIC = '0'
 
 1. 在课件、资料、试卷三个区选取材料，点击“提交处理”，等解析结束后点“分析本批资料”。单张扫描图归属不明时可以打开原图核对；已知属于同一卷的扫描页可按原顺序整理为一份 PDF。
 2. 在“真题频次”展开考点，按标签区分课件与资料出处并核对每道真题（既可新窗口打开，也可点“页内对照”在右侧面板或窄屏底部抽屉查看高亮原行、缩放原页或下载原件，关闭后保留“刚查看”标记）。切至“参考计划”页签看学习顺序，可原地“展开考点与依据”或点“去待办记笔记”直达对应输入框；在“复习待办”页签边对照原文边勾选、写笔记并保存。点击“下载 Markdown 复习文档”取得当前版本的正命中考点和逐题依据。
-3. 追加材料时，在“已上传文件”勾选本次仍要分析的文件，与新材料一起提交。文件行显示“复用已有解析”或“本次解析”。同课、同内容、同格式且解析配置匹配时，系统校验正文和预览后复用；缺失或损坏的结果按文件重建。点击“分析本批资料”会按本批完整清单重新统计。分析中断后可重开原批次重试，并继续查看上次发布的结果。
+3. 追加材料时，在“已上传文件”勾选本次仍要分析的文件，与新材料一起提交。文件行显示“复用已有解析”或“本次解析”。同课、同内容、同格式且解析配置匹配时，系统校验正文和预览后复用；缺失或损坏的结果按文件重建。点击“分析本批资料”会按本批完整清单重新统计。分析中断后可重开原批次找回后台任务，并继续查看上次发布的结果。
 4. 前台按 Ctrl+C 结束 Java，再运行 `docker compose -p final-review-m5 --env-file .local/m5.env stop` 停止试用存储。代码未变时用 `./m1.ps1 -Trial -BasicParsing -SkipBuild` 重开。
 
 **复跑自制课程验收。** 保持上述服务运行，在第二个 PowerShell 7 终端进入仓库根目录。浏览器测试需要 Edge。下列用例会向 18085 专用课程发布分析并写入试用笔记。恢复用例另用 18086，只中断自己启动的 Java，清除该版本的一个试用缓存键。样本生成器使用 `soffice.com`；如果它不在 PATH，给第一条命令追加 `-Office '<soffice.com 的完整路径>'`。
@@ -41,6 +41,25 @@ python m5-tests/holdout.py
 ```
 
 其中 `m5-tests/ui-refactor.mjs` 通过路由拦截验证双轨批次工作区、页内原文对照、四页签键盘切换、409 冲突核对、视频统计层级与宽窄屏防溢出，不向课程库写入数据。生成的课件、讲义、三份样卷和一张散页在 `.local/m5-samples`。人工答案和逐题断言在 [M5 课程用例](m5-tests/course.mjs)，机器配置、耗时、质量基线及视频服务限制见 [M5 逐项验收记录](knowledge-base/m5-acceptance.md)。
+
+### R2 后台分析与恢复
+
+在批次工作区点击“分析本批资料”，页面会显示任务号和当前阶段。刷新页面或切回课程可找回任务；提交响应丢失时，再次提交会使用原请求标识。同一课程一次运行一个分析。已发布或失败后，点击“重新分析本批资料”会创建新任务。排队期间重新识别文件，对已受理任务仍使用原解析版本。工作台下方保留已发布快照，可继续打开出处、保存笔记及下载所选版本的 Markdown。
+
+启动脚本会一并启动 RocketMQ NameServer、Broker 和 Redis。常规环境的 NameServer、Broker 端口分别为 39876、30911，试用环境为 39885、30985，均只绑定本机。可用 `REVIEW_MQ_PORT` 与 `REVIEW_BROKER_PORT` 配置常规环境。MySQL 保存任务及投递状态，Broker 恢复后自动补投。Redis 不可用时等待恢复；一个实例默认一个消费线程，暂时执行故障最多执行三次，重试间隔 2 秒。失联任务的接管期限为 Agent 超时加 30 秒。消息等待消费超过 30 秒可补投；重复消息沿用同一任务。
+
+异步接口沿用课程前缀和 `X-Review-Request: 1`。向 `POST /jobs/{job}/analysis-tasks` 提交 `{"requestId":"<UUID>"}`，返回 202 和任务。重复请求可读回原任务，另一请求遇到本课活动任务返回 409 和该任务。通过 `GET /analysis-tasks/{id}` 查状态；工作台用 `GET /jobs/{job}/analysis-tasks` 找回本课活动任务或该批最近任务，无记录时返回 204。旧同步 `POST /jobs/{job}/analysis` 仍返回完整快照，可传 `Idempotency-Key` 安全重发。常规实例使用同一分析主题；同库的专用故障 Agent 可以用 `--review.analysis-topic=FaultAnalysis` 隔离消费。
+
+**复跑 R2 验收。** 在仓库根目录完成前后端打包，使用 PowerShell 7 执行以下命令。试用脚本使用独立 Docker 项目 `final-review-r2` 和 `.local/r2.env`。
+
+```powershell
+./r2-tests/trial.ps1 -StorageOnly
+./r2-tests/trial.ps1 -Agent r2-tests/agent.py -TimeoutSeconds 9
+# 在第二个终端运行
+node r2-tests/tasks.mjs
+```
+
+升级与崩溃验收使用 JDK 21 的调试接口和 M5 自制 PDF。准备好自制样本和 V5、V6 旧版 JAR 后，执行 `node r2-tests/recovery.mjs "<V5 JAR 路径>" "<V6 JAR 路径>"`。它在 R2 专用 MySQL 中新建测试库，自行启动并结束 18128、18129 的测试 Java 实例。两套用例都会短暂停启 R2 专用中间件，应依次执行。结束后可用 `docker compose -p final-review-r2 --env-file .local/r2.env stop` 停止试用容器，保留数据卷。
 
 ### M6 双课与重启验收
 
@@ -100,7 +119,7 @@ python -m unittest discover -s m2-tests -v
 python m2-tests/holdout.py
 ```
 
-故障验收可在同一专用测试库上另启一个后端实例，追加启动参数 `--server.port=18083 --review.agent=m2-tests/fault_agent.py --review.agent-timeout-seconds=2`，将 `REVIEW_FAULT_URL` 设为该实例的本机地址后运行 `edges.mjs`。Redis 回退可在专用实例上停用缓存，比较停用前后 `GET /api/course/analysis` 的完整响应，再恢复缓存。
+故障验收可在同一专用测试库上另启一个后端实例，追加启动参数 `--server.port=18083 --review.agent=m2-tests/fault_agent.py --review.agent-timeout-seconds=2 --review.analysis-topic=FaultAnalysis`，将 `REVIEW_FAULT_URL` 设为该实例的本机地址后运行 `edges.mjs`。Redis 回退可在专用实例上停用缓存，比较停用前后 `GET /api/course/analysis` 的完整响应，再恢复缓存。
 
 已准备 M0 模型时，直接运行 Python 测试前可设置 `$env:REVIEW_SEMANTIC='1'` 并使用兼容的 Python 3.12。四题独立抽查卷共标注 5 个考点关联，本机模型命中 4 个，无额外命中。隐含外键考点的一题进入待核对。该样例用于跟踪后续变化。
 
@@ -157,6 +176,8 @@ node m1-tests/import.mjs '<M0 样例输出目录>'
 单独运行 `./m0/video.ps1` 可重新探测 B 站公开搜索、已知视频的分 P 目录及整条视频的互动指标。网络或接口失败会记入 `m0/out/video.json`。本地样卷验收可以离线重跑。
 
 ## 开发约定
+
+- [六项改造开发路线图](knowledge-base/ROADMAP.md) 列出下一轮规划的实施顺序、依赖与验收场景。
 
 - [项目知识库索引](knowledge-base/index.json) 记录文档状态、核验依据及适用范围。
 - [开发问题与性能优化记录](knowledge-base/development-notes.md) 汇集问题背景、解决方案和验证结果，供整理项目亮点时查阅。

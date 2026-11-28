@@ -158,14 +158,21 @@ class ImportApi {
       throw new ResponseStatusException(HttpStatus.CONFLICT);
   }
 
+  String currentArtifact(String job, String file) {
+    return artifacts.current(job, file);
+  }
+
   @GetMapping("/jobs/{job}/{file}/segments")
   List<Source> segments(@PathVariable(name="course", required=false) String course, @PathVariable UUID job, @PathVariable String file) {
     var owner = ownedJob(course, job);
     var f = ownedFile(owner.id(), file);
-    String artifact = artifacts.current(job.toString(), file);
-    if (artifact == null && db.preview(job.toString(), file) == null) throw missing();
-    String kind = Parser.kind(f.name());
-    var segments = artifact == null ? db.segments(job.toString(), file) : artifacts.segments(artifact);
+    String artifact = currentArtifact(job.toString(), file);
+    return readSources(owner, job.toString(), file, Parser.kind(f.name()), artifact);
+  }
+
+  List<Source> readSources(CourseMapper.Course owner, String job, String file, String kind, String artifact) {
+    if (artifact == null && db.preview(job, file) == null) throw missing();
+    var segments = artifact == null ? db.segments(job, file) : artifacts.segments(artifact);
     return segments.stream()
         .map(
             s -> {

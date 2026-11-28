@@ -222,9 +222,16 @@ try {
   await page.route("**/api/course/jobs", (route) =>
     route.fulfill({ json: ["job-3", "job-2", "job-1"] }),
   );
-  await page.route("**/api/course/jobs/*/analysis", (route) =>
-    route.fulfill({ status: 504, body: "Gateway Timeout" }),
-  );
+  let failedTask;
+  await page.route("**/api/course/jobs/*/analysis-tasks", route => {
+    if (route.request().method() === "POST") {
+      failedTask = { id: "ui-timeout", job: "job-1", requestId: route.request().postDataJSON().requestId,
+        state: "failed", attempts: 3, reason: "分析超时，请重试" };
+      return route.fulfill({ status: 202, json: failedTask });
+    }
+    return failedTask ? route.fulfill({ json: failedTask }) : route.fulfill({ status: 204 });
+  });
+  await page.route("**/api/course/analysis-tasks/ui-timeout", route => route.fulfill({ json: failedTask }));
   await page.route("**/api/course/jobs/*/exam-md/preview/lines.html", (route) =>
     route.fulfill({
       contentType: "text/html; charset=utf-8",

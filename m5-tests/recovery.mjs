@@ -1,3 +1,4 @@
+import { waitForPublication } from "../r2-tests/publication.mjs";
 import assert from "node:assert/strict";
 import {spawn, execFileSync} from "node:child_process";
 import {mkdtemp, readFile, stat, unlink} from "node:fs/promises";
@@ -20,7 +21,7 @@ for (const line of (await readFile(".local/m5.env","utf8")).split(/\r?\n/)) {
 }
 let service, closed, browser;
 async function until(test, message) {
-  for (let i=0; i<150; i++) {
+  for (let i=0; i<550; i++) {
     if (await test()) return;
     await delay(200);
   }
@@ -32,7 +33,7 @@ async function start(fault) {
   await new Promise(ok=>probe.close(ok));
   const args = ["-Djava.io.tmpdir="+dir, "-jar","server/target/review-import-1.0.0.jar","--server.port=18086",
     "--spring.datasource.url=jdbc:mysql://127.0.0.1:33315/review?connectionTimeZone=UTC&allowPublicKeyRetrieval=true&sslMode=DISABLED",
-    "--review.endpoint=http://127.0.0.1:39015","--spring.data.redis.port=36385"];
+    "--review.endpoint=http://127.0.0.1:39015","--spring.data.redis.port=36385","--review.rocketmq-address=127.0.0.1:39885","--review.analysis-topic=M5Recovery"];
   if (fault) args.push("--review.agent=m5-tests/wait_agent.py","--review.agent-timeout-seconds=5");
   service = spawn("java",args,{env,windowsHide:true,stdio:"ignore"});
   closed = once(service,"exit");
@@ -82,7 +83,8 @@ try {
     assert.deepEqual(await state(before.version),saved);
     assert.equal(await exportOf(before.version),md);
   };
-  const analyze = () => fetch(root+"jobs/"+id+"/analysis",{method:"POST",headers});
+  const requestId = crypto.randomUUID();
+  const analyze = () => fetch(root+"jobs/"+id+"/analysis",{method:"POST",headers:{...headers,"Idempotency-Key":requestId}});
   const entered = () => until(()=>stat(marker).then(()=>true,()=>false),"未进入 Agent");
   const interrupted = analyze().then(r=>r.status,()=>0);
   await entered();
@@ -106,7 +108,7 @@ try {
   // Reselect after the initial poll has finished, as on a reopened course.
   await page.getByRole("button",{name:"查看文本与来源"}).first().waitFor();
   await page.getByLabel("处理批次").selectOption(id);
-  const [r] = await Promise.all([page.waitForResponse(r=>r.url().endsWith("/jobs/"+id+"/analysis")),
+  const [r] = await Promise.all([waitForPublication(page),
     page.getByRole("button",{name:"分析本批资料"}).click()]);
   assert.equal(r.status(),200);
   const after = await r.json();

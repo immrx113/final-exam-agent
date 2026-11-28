@@ -1,5 +1,42 @@
 name: final-review-m1
 services:
+  nameserver:
+    image: apache/rocketmq:5.3.2@sha256:4a80ff5cd4b0a3d3ef6dc338ce2028a85bd995648cb3aa5c3e753746d2dbc587
+    command: ["sh", "mqnamesrv"]
+    environment:
+      JAVA_OPT_EXT: "-Xms128m -Xmx128m -Xmn64m"
+    ports:
+      - "127.0.0.1:${REVIEW_MQ_PORT:-39876}:9876"
+  mq-store-init:
+    image: apache/rocketmq:5.3.2@sha256:4a80ff5cd4b0a3d3ef6dc338ce2028a85bd995648cb3aa5c3e753746d2dbc587
+    user: "0"
+    command: ["chown", "rocketmq:rocketmq", "/home/rocketmq/store"]
+    volumes:
+      - mq-data:/home/rocketmq/store
+  broker:
+    image: apache/rocketmq:5.3.2@sha256:4a80ff5cd4b0a3d3ef6dc338ce2028a85bd995648cb3aa5c3e753746d2dbc587
+    depends_on:
+      nameserver:
+        condition: service_started
+      mq-store-init:
+        condition: service_completed_successfully
+    environment:
+      JAVA_OPT_EXT: "-Xms256m -Xmx256m -Xmn128m -XX:MaxDirectMemorySize=256m"
+    command:
+      - sh
+      - -ec
+      - |
+        printf '%s\n' 'brokerIP1=127.0.0.1' 'listenPort=${REVIEW_BROKER_PORT:-30911}' 'autoCreateTopicEnable=true' > /tmp/review-broker.conf
+        exec sh mqbroker -n nameserver:9876 -c /tmp/review-broker.conf
+    ports:
+      - "127.0.0.1:${REVIEW_BROKER_PORT:-30911}:${REVIEW_BROKER_PORT:-30911}"
+    healthcheck:
+      test: ["CMD", "bash", "-c", "true > /dev/tcp/127.0.0.1/${REVIEW_BROKER_PORT:-30911}"]
+      interval: 3s
+      timeout: 2s
+      retries: 30
+    volumes:
+      - mq-data:/home/rocketmq/store
   redis:
     image: redis:7.4-alpine@sha256:7f7d30b7fdd09467bac58198a1f166dd69789d348d4fe859cccb20e0cf287fbe
     ports:
@@ -32,5 +69,6 @@ services:
     volumes:
       - object-data:/bitnami/minio/data
 volumes:
+  mq-data:
   mysql-data:
   object-data:

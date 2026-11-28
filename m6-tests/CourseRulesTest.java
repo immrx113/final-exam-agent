@@ -21,22 +21,10 @@ class CourseRulesTest {
   }
 
   public static void main(String[] args) {
-    var analysis =
-        new AnalysisApi(null, null, null, null, null, null, null, "python", "m2/agent.py", 5);
-
-    // 1. Concurrent analysis vs course delete guard
-    analysis.enterAnalysis("c-busy");
-    expectStatus(HttpStatus.CONFLICT, () -> analysis.beginCourseDelete("c-busy"));
-    analysis.exitAnalysis("c-busy");
-
-    analysis.beginCourseDelete("c-del");
-    expectStatus(HttpStatus.CONFLICT, () -> analysis.beginCourseDelete("c-del"));
-    expectStatus(HttpStatus.NOT_FOUND, () -> analysis.enterAnalysis("c-del"));
-    analysis.endCourseDelete("c-del");
-    analysis.enterAnalysis("c-del");
-    analysis.exitAnalysis("c-del");
-
-    // 2. CourseApi default course lock, name validation, active-item guard & cascade order
+    Set<String> activeTasks = new HashSet<>();
+    TaskMapper tasks = (TaskMapper) Proxy.newProxyInstance(TaskMapper.class.getClassLoader(),
+        new Class<?>[]{TaskMapper.class}, (proxy, method, params) ->
+          activeTasks.contains(params[0]) ? new TaskMapper.Task("t","j","k","pending",0,null,null,null) : null);
     Map<String, CourseMapper.Course> store = new LinkedHashMap<>();
     store.put(
         "default", new CourseMapper.Course("default", "数据库原理", "数据库原理", "database"));
@@ -120,7 +108,7 @@ class CourseRulesTest {
               protected void doRollback(DefaultTransactionStatus status) {}
             });
 
-    CourseApi api = new CourseApi(mapper, analysis, tx, null);
+    CourseApi api = new CourseApi(mapper, tasks, tx, null);
 
     // Default course cannot be renamed or deleted
     expectStatus(
@@ -165,10 +153,13 @@ class CourseRulesTest {
 
     // Idle course deletes child tables in exact FK-safe order (null Redis template skipped safely or let's verify steps)
     activeItemCourses.clear();
+    activeTasks.add("c-os");
+    expectStatus(HttpStatus.CONFLICT, () -> api.delete("c-os"));
+    activeTasks.clear();
     CourseApi apiNoCache =
         new CourseApi(
             mapper,
-            analysis,
+            tasks,
             tx,
             new org.springframework.data.redis.core.StringRedisTemplate() {
               @Override

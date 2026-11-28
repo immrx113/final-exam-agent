@@ -8,8 +8,8 @@ interface AnalysisMapper {
   record Counts(String topic, int questions, int papers) {}
 
   @Insert(
-      "INSERT INTO analysis_versions(version_id, job, result_json,course_id) VALUES(#{version}, #{job}, '',#{course})")
-  void begin(String course, String version, String job);
+      "INSERT INTO analysis_versions(version_id, job, result_json,course_id,task_id) VALUES(#{version}, #{job}, '',#{course},#{task})")
+  void begin(String course, String version, String job, String task);
 
   @Insert("INSERT INTO analysis_hits VALUES(#{version}, #{topic}, #{paper}, #{number})")
   void hit(String version, String topic, String paper, int number);
